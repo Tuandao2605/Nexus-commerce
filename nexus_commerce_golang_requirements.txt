@@ -1,0 +1,1320 @@
+NEXUS COMMERCE
+Production-Grade Multi-Vendor E-Commerce Platform
+
+Backend: Golang
+Architecture: Modular Monolith -> Event-Driven Microservices
+Database: PostgreSQL
+Mục tiêu: Backend / Distributed Systems / Security / DevOps / Production Engineering
+
+1. TỔNG QUAN
+============
+
+Xây dựng một nền tảng thương mại điện tử multi-vendor tương tự phiên bản thu nhỏ của Shopee/Lazada.
+
+Hệ thống không chỉ dừng ở CRUD mà phải giải quyết những vấn đề thực tế:
+- Authentication & Authorization
+- Multi-vendor architecture
+- Product/SKU modeling
+- Inventory concurrency
+- Distributed transactions
+- Payment reliability
+- Idempotency
+- Event-driven architecture
+- Cache consistency
+- Search
+- Security
+- Observability
+- Resilience
+- Load testing
+- CI/CD
+- Container orchestration
+
+Mục tiêu cuối cùng là xây dựng một backend có thể giải thích được:
+Điều gì xảy ra nếu request bị gửi lại, hai người mua sản phẩm cuối cùng cùng lúc, Redis chết, payment timeout, webhook đến hai lần, broker ngừng hoạt động hoặc một service crash giữa transaction?
+
+2. KIẾN TRÚC TỔNG THỂ
+=====================
+
+Không bắt đầu bằng microservices.
+
+Hệ thống phát triển theo:
+
+Stage 1
+Modular Monolith
+
+    ↓
+
+Stage 2
+Event-Driven Modular Monolith
+
+    ↓
+
+Stage 3
+Selective Microservices
+
+Kiến trúc mục tiêu:
+
+                        CLIENT
+                           |
+                           v
+                    +-------------+
+                    | API Gateway |
+                    +------+------+
+                           |
+         +-----------------+-----------------+
+         |                 |                 |
+         v                 v                 v
+       Auth             Catalog            Order
+         |                 |                 |
+         |           +-----v-----+     +-----v-----+
+         |           | Inventory |     |  Payment  |
+         |           +-----+-----+     +-----+-----+
+         |                 |                 |
+         +-----------------+-----------------+
+                           |
+                           v
+                    Message Broker
+                  RabbitMQ / Kafka
+                           |
+            +--------------+--------------+
+            v              v              v
+      Notification     Analytics       Workers
+
+        PostgreSQL
+            |
+          Redis
+            |
+        ElasticSearch
+            |
+        MinIO / S3
+
+Mỗi module/service phải có lý do tồn tại rõ ràng.
+Không tách microservice chỉ để làm kiến trúc phức tạp hơn.
+
+3. CÔNG NGHỆ
+============
+
+Backend
+- Language: Go
+- HTTP Framework: Chi
+
+Database
+- PostgreSQL
+- pgx
+- sqlc
+- golang-migrate
+
+Ưu tiên SQL trực tiếp thay vì ORM để học:
+- SQL
+- transaction
+- indexes
+- MVCC
+- locking
+- isolation level
+- query planning
+- database optimization
+
+Infrastructure
+- Redis
+- RabbitMQ
+- ElasticSearch
+- MinIO / S3
+
+Kafka có thể được nghiên cứu/tích hợp sau khi RabbitMQ hoạt động ổn định.
+
+Observability
+- OpenTelemetry
+- Prometheus
+- Grafana
+- Loki
+- slog
+
+Testing
+- testing
+- testify
+- testcontainers-go
+- k6
+
+DevOps
+- Docker
+- Docker Compose
+- GitHub Actions
+- Kubernetes
+- Helm
+- Terraform
+
+4. GO PROJECT STRUCTURE
+=======================
+
+nexus-commerce/
+|
++-- cmd/
+|   +-- api/
+|   |   +-- main.go
+|   |
+|   +-- worker/
+|       +-- main.go
+|
++-- internal/
+|   +-- auth/
+|   +-- user/
+|   +-- seller/
+|   +-- catalog/
+|   +-- inventory/
+|   +-- cart/
+|   +-- order/
+|   +-- payment/
+|   +-- voucher/
+|   +-- notification/
+|
++-- pkg/
+|
++-- sql/
+|   +-- queries/
+|   +-- sqlc.yaml
+|
++-- migrations/
+|
++-- configs/
+|
++-- deployments/
+|
++-- scripts/
+|
++-- tests/
+|   +-- integration/
+|   +-- concurrency/
+|   +-- e2e/
+|
++-- docs/
+|   +-- requirements.md
+|   +-- architecture.md
+|   +-- erd.md
+|   +-- api.md
+|
++-- Dockerfile
++-- docker-compose.yml
++-- Makefile
++-- go.mod
++-- go.sum
+
+Không bắt buộc giữ nguyên cấu trúc này nếu trong quá trình phát triển xuất hiện thiết kế tốt hơn.
+
+5. ACTORS
+=========
+
+Customer
+- đăng ký
+- đăng nhập
+- quản lý profile
+- quản lý địa chỉ
+- tìm kiếm sản phẩm
+- xem shop
+- thêm sản phẩm vào cart
+- sử dụng voucher
+- checkout
+- thanh toán
+- xem lịch sử đơn
+- hủy đơn khi hợp lệ
+- yêu cầu refund
+- review sản phẩm đã mua
+
+Seller
+- đăng ký seller
+- tạo shop
+- quản lý shop
+- tạo sản phẩm
+- tạo variant/SKU
+- upload ảnh
+- quản lý giá
+- quản lý inventory
+- xem đơn hàng liên quan
+- xử lý đơn
+- xem thống kê doanh thu
+
+Seller A không được chỉnh sửa tài nguyên của Seller B.
+
+Admin
+- quản lý users
+- quản lý sellers
+- khóa/mở shop
+- moderation sản phẩm
+- quản lý category
+- quản lý promotion
+- xem audit logs
+- xem system dashboard
+
+System
+- notification
+- email
+- webhook
+- inventory expiration
+- payment reconciliation
+- event delivery
+- analytics
+- scheduled jobs
+
+6. IDENTITY & AUTHENTICATION
+============================
+
+Entity:
+- User
+- Role
+- Permission
+- UserRole
+- RolePermission
+- Session
+- RefreshToken
+- Address
+- AuditLog
+
+Hỗ trợ:
+- registration
+- login
+- logout
+- email verification
+- password reset
+- access token
+- refresh token
+- refresh token rotation
+- token revocation
+- session management
+- RBAC
+- permission-based authorization
+
+Role dự kiến:
+- CUSTOMER
+- SELLER
+- ADMIN
+- SUPPORT
+- WAREHOUSE_MANAGER
+
+Authorization không được chỉ dựa vào role.
+Cần kiểm tra cả ownership.
+
+Ví dụ:
+Seller A -> PATCH Product B
+Product B belongs to Seller B
+-> 403 Forbidden
+
+7. CATALOG
+==========
+
+Catalog phải hỗ trợ:
+- Product
+- ProductVariant
+- SKU
+- Category
+- Brand
+- Attribute
+- AttributeValue
+- ProductImage
+- Shop
+
+SKU là đơn vị thực tế được bán và quản lý tồn kho.
+
+Catalog phải hỗ trợ:
+- pagination
+- filtering
+- sorting
+- category
+- brand
+- price range
+- seller/shop
+- product status
+- SKU status
+- product moderation
+- search
+
+8. SEARCH
+=========
+
+Khi dữ liệu lớn, không phụ thuộc vào:
+WHERE name LIKE '%iphone%'
+
+Tích hợp:
+ElasticSearch
+
+Search API phải hỗ trợ dạng:
+GET /products
+?q=iphone
+&brand=apple
+&category=phone
+&minPrice=10000000
+&maxPrice=30000000
+&sort=price_asc
+&page=1
+&limit=20
+
+Advanced requirements:
+- full-text search
+- autocomplete
+- typo tolerance
+- Vietnamese search
+- relevance ranking
+- filter
+- sorting
+
+Phải thiết kế cơ chế đồng bộ PostgreSQL -> ElasticSearch
+và xử lý trường hợp search index bị stale.
+
+9. SHOPPING CART
+================
+
+Entity:
+- Cart
+- CartItem
+
+Operations:
+- add item
+- remove item
+- update quantity
+- list cart
+- clear cart
+
+Cart không được coi giá cũ là source of truth khi checkout.
+
+Checkout phải validate lại:
+- SKU
+- price
+- availability
+- status
+- voucher
+- inventory
+
+10. INVENTORY
+=============
+
+Entity:
+- Warehouse
+- Inventory
+- InventoryReservation
+- StockMovement
+
+Inventory phải phân biệt tối thiểu:
+- available_quantity
+- reserved_quantity
+
+Flow:
+AVAILABLE -> RESERVED -> COMMITTED/SOLD
+                |
+                -> RELEASED
+
+Reservation phải có expiration.
+
+Nếu customer không thanh toán trong thời gian quy định:
+RESERVED -> RELEASED
+
+11. INVENTORY CONCURRENCY
+=========================
+
+Giả sử stock = 50
+Có 1000 concurrent checkout requests
+
+Expected:
+- 50 success
+- 950 out-of-stock
+- stock >= 0
+
+Không được overselling.
+
+Phải nghiên cứu và lựa chọn giữa:
+- atomic SQL update
+- optimistic locking
+- pessimistic locking
+- PostgreSQL row locking
+
+Phải hiểu goroutine synchronization không thay thế được database concurrency control khi chạy nhiều application instance.
+
+12. ORDER
+=========
+
+Entity:
+- Order
+- OrderItem
+- OrderStatusHistory
+
+Order sử dụng state machine:
+CREATED
+-> AWAITING_PAYMENT
+-> PAID
+-> PROCESSING
+-> SHIPPED
+-> DELIVERED
+
+Các state khác:
+- CANCELLED
+- PAYMENT_FAILED
+- REFUND_PENDING
+- REFUNDED
+
+Không cho phép state transition không hợp lệ.
+
+13. ORDER SNAPSHOT
+==================
+
+OrderItem phải lưu snapshot của dữ liệu lúc mua.
+
+Snapshot có thể gồm:
+- product_name
+- sku_name
+- price
+- quantity
+- seller
+- attributes
+
+14. CHECKOUT
+============
+
+Checkout flow:
+Customer
+-> Load Cart
+-> Validate SKU
+-> Validate Current Price
+-> Validate Voucher
+-> Calculate Total
+-> Reserve Inventory
+-> Create Order
+-> Create Payment
+
+Phải xử lý failure ở từng bước.
+
+Nếu:
+- Reserve Inventory: SUCCESS
+- Create Order: SUCCESS
+- Payment: FAILED
+
+thì không được để inventory bị reserve vĩnh viễn.
+
+Sau này phải nghiên cứu:
+- Saga Pattern
+- Compensating Transaction
+
+15. VOUCHER & PROMOTION
+=======================
+
+Entity:
+- Voucher
+- VoucherRule
+- VoucherUsage
+
+Hỗ trợ:
+- percentage discount
+- fixed discount
+- minimum order
+- maximum discount
+- expiration
+- total usage limit
+- per-user limit
+- seller-specific voucher
+- platform voucher
+
+Phải xử lý concurrency.
+
+Ví dụ:
+Voucher còn 1 lượt
+100 customers sử dụng cùng lúc
+-> chỉ một người được thành công.
+
+16. PAYMENT
+===========
+
+Xây dựng một Mock Payment Provider.
+
+Payment có thể:
+- SUCCESS
+- FAILED
+- PENDING
+- TIMEOUT
+
+Payment provider gửi:
+POST /webhooks/payments
+
+Backend phải xử lý:
+- webhook verification
+- webhook signature
+- replay protection
+- duplicate webhook
+- delayed webhook
+- retries
+- payment reconciliation
+
+17. PAYMENT IDEMPOTENCY
+=======================
+
+Nếu payment provider gửi nhiều PAYMENT_SUCCESS trùng lặp,
+Order chỉ được PAID một lần.
+
+Không được:
+- double charge
+- double inventory commit
+- double notification
+- duplicate accounting operation
+
+18. API IDEMPOTENCY
+===================
+
+Critical write APIs phải hỗ trợ:
+Idempotency-Key
+
+Ví dụ:
+POST /checkout
+Idempotency-Key: 550e8400...
+
+Client gửi request 5 lần vì timeout.
+
+Expected:
+- 1 checkout
+- 1 order
+- 1 payment
+
+Thiết kế storage:
+- IdempotencyKey
+- requestHash
+- status
+- response
+- expiresAt
+
+Reuse cùng key nhưng request body khác phải bị reject.
+
+19. EVENT-DRIVEN ARCHITECTURE
+=============================
+
+Ban đầu dùng RabbitMQ.
+
+Event có thể gồm:
+- OrderCreated
+- OrderPaid
+- OrderCancelled
+- OrderShipped
+- PaymentSucceeded
+- PaymentFailed
+- InventoryReserved
+- InventoryReleased
+- ProductUpdated
+
+20. TRANSACTIONAL OUTBOX
+========================
+
+Không được:
+UPDATE database
+broker.Publish()
+
+và giả định cả hai luôn thành công.
+
+Phải implement Transactional Outbox Pattern:
+BEGIN
+UPDATE orders ...
+INSERT INTO outbox_events ...
+COMMIT
+
+Sau đó:
+Outbox Worker -> Message Broker -> Consumers
+
+Nếu broker chết, event vẫn tồn tại trong database để retry.
+
+21. RELIABLE CONSUMER
+=====================
+
+Consumer phải chịu được:
+- duplicate event
+- retry
+- consumer crash
+- network failure
+- out-of-order event
+
+Consumer phải idempotent.
+
+Có thể implement Inbox Pattern hoặc cơ chế tương đương.
+
+Phải chứng minh At-least-once delivery không làm business operation chạy nhiều lần.
+
+22. REDIS
+=========
+
+Redis có thể dùng cho:
+- Cache
+- Rate Limiting
+- Session
+- Distributed coordination
+- Cart
+- Short-lived data
+- Inventory reservation support
+
+Không dùng Redis chỉ để đưa vào tech stack.
+
+23. CACHE STRATEGY
+==================
+
+Phải nghiên cứu Cache Aside Pattern và giải quyết cache invalidation.
+
+Phải xác định:
+- TTL
+- invalidation
+- cache key convention
+- cache miss
+- cache penetration
+- cache stampede
+
+24. GO CONCURRENCY
+==================
+
+Phải hiểu:
+- goroutine
+- channel
+- select
+- sync.Mutex
+- sync.RWMutex
+- WaitGroup
+- errgroup
+
+Không sử dụng goroutine chỉ để chứng minh đang dùng Go.
+
+Ứng dụng thực tế:
+- background workers
+- event processing
+- parallel independent I/O
+- graceful shutdown
+- batch processing
+
+25. CONTEXT PROPAGATION
+=======================
+
+context.Context phải được propagate:
+HTTP -> Handler -> Service -> Repository -> PostgreSQL
+
+Không tạo context.Background() tùy tiện trong request flow.
+
+Client disconnect hoặc deadline hết hạn phải có khả năng cancel downstream work.
+
+26. DATABASE ENGINEERING
+========================
+
+Phải nghiên cứu và sử dụng:
+- connection pooling
+- transactions
+- indexes
+- constraints
+- foreign keys
+- unique constraints
+- MVCC
+- locking
+- isolation levels
+- query plans
+
+Sử dụng:
+- EXPLAIN
+- EXPLAIN ANALYZE
+
+27. SECURITY
+============
+
+Hệ thống phải được thiết kế chống:
+- SQL Injection
+- Broken Access Control
+- IDOR
+- XSS
+- CSRF khi phù hợp
+- credential stuffing
+- brute force
+- JWT attacks
+- refresh token theft
+- mass assignment
+- rate-limit bypass
+- webhook forgery
+- replay attacks
+- file upload attacks
+- sensitive-data exposure
+
+Password phải được hash bằng password hashing algorithm phù hợp.
+Secret không hardcode trong source code.
+
+28. RATE LIMITING
+=================
+
+Implement distributed rate limiter với Redis.
+
+Có thể dùng Token Bucket.
+
+Policy khác nhau cho:
+- Login
+- Register
+- Password Reset
+- Search
+- Checkout
+- General API
+
+Identity có thể dựa vào:
+- IP
+- User ID
+- API identity
+
+Rate limiter phải hoạt động khi chạy nhiều API instances.
+
+29. AUDIT LOGGING
+=================
+
+Audit record tối thiểu:
+- WHO
+- WHAT
+- WHEN
+- RESOURCE
+- RESULT
+- IP
+- REQUEST_ID
+
+Audit log không được chứa password/token/secret.
+
+30. STRUCTURED LOGGING
+======================
+
+Sử dụng slog.
+
+Log cần có:
+- timestamp
+- level
+- request_id
+- trace_id
+- user_id
+- service
+- operation
+- latency
+- status
+- error
+
+31. OBSERVABILITY
+=================
+
+Tích hợp:
+- OpenTelemetry
+- Prometheus
+- Grafana
+- Loki
+
+Metrics:
+- request_rate
+- error_rate
+- latency
+- p50
+- p95
+- p99
+- DB connections
+- DB latency
+- Redis hit ratio
+- checkout success rate
+- payment failure rate
+- inventory reservation failures
+- queue depth
+- consumer lag
+
+32. DISTRIBUTED TRACING
+=======================
+
+Một checkout phải trace được:
+HTTP Request
+-> Checkout
+-> Catalog
+-> Voucher
+-> Inventory
+-> Order
+-> Payment
+
+Mục tiêu:
+Khi checkout mất 2 giây, phải xác định được 2 giây nằm ở đâu.
+
+33. RESILIENCE
+==============
+
+Phải implement/nghiên cứu:
+- timeout
+- retry
+- exponential backoff
+- circuit breaker
+- graceful degradation
+- dead-letter queue
+- health check
+- readiness check
+- graceful shutdown
+
+Không retry mọi lỗi một cách mù quáng.
+Phải phân biệt lỗi retryable và non-retryable.
+
+34. GRACEFUL SHUTDOWN
+=====================
+
+Khi nhận SIGTERM:
+- Stop accepting new requests
+- Finish active requests
+- Stop workers
+- Close broker
+- Close Redis
+- Close PostgreSQL pool
+- Exit
+
+35. HEALTH CHECKS
+=================
+
+Cung cấp:
+- GET /health
+- GET /ready
+
+/health:
+Process còn hoạt động.
+
+/ready:
+Instance đủ điều kiện nhận traffic.
+
+36. TESTING STRATEGY
+====================
+
+Phải có:
+- Unit Tests
+- Integration Tests
+- Repository Tests
+- API Tests
+- Concurrency Tests
+- Security Tests
+- Load Tests
+- Failure Tests
+- End-to-End Tests
+
+Integration test ưu tiên testcontainers-go.
+
+37. CONCURRENCY TESTING
+=======================
+
+Bắt buộc có automated test:
+stock = 50
+1000 concurrent purchase attempts
+
+Invariant:
+- successful purchases <= 50
+- inventory >= 0
+
+Tương tự với voucher usage.
+
+38. FAILURE / CHAOS TESTING
+===========================
+
+Phải thử:
+- Kill Payment component during checkout
+- Kill Redis
+- Restart PostgreSQL
+- Stop RabbitMQ
+- Duplicate webhook
+- Delay webhook
+- Duplicate event
+- Kill consumer during event processing
+- Restart API instance during requests
+
+Sau failure phải kiểm tra:
+- No lost order
+- No double payment
+- No negative inventory
+- No duplicated refund
+
+39. LOAD TESTING
+================
+
+Sử dụng k6.
+
+Test:
+- Product browsing
+- Search
+- Login
+- Cart
+- Checkout
+- Order history
+
+Báo cáo:
+- RPS
+- p50
+- p95
+- p99
+- error rate
+- CPU
+- RAM
+- DB usage
+- Redis usage
+
+40. PERFORMANCE CHALLENGE
+=========================
+
+Synthetic dataset:
+- Products: 1,000,000
+- Users: 100,000
+- Orders: 1,000,000
+
+Mục tiêu thử nghiệm:
+- 1,000+ concurrent clients
+- 500-2,000 req/s
+
+Không bắt buộc máy local đạt toàn bộ mục tiêu.
+
+Quan trọng:
+Measure -> Find Bottleneck -> Optimize -> Measure Again
+
+41. OBJECT STORAGE
+==================
+
+Development:
+MinIO
+
+Production-compatible:
+S3
+
+Phải xử lý:
+- file size
+- allowed content types
+- generated filename
+- authorization
+- metadata
+- orphan file cleanup
+
+42. DOCKER
+==========
+
+Local infrastructure chạy được bằng:
+docker compose up
+
+Bao gồm tối thiểu:
+- PostgreSQL
+- Redis
+- RabbitMQ
+- ElasticSearch
+- MinIO
+
+43. CI/CD
+=========
+
+Pipeline:
+Commit
+-> Format / Lint
+-> Unit Tests
+-> Integration Tests
+-> Security Scan
+-> Build
+-> Docker Image
+-> Push Registry
+-> Deploy Staging
+-> Smoke Tests
+
+Không deploy nếu test quan trọng thất bại.
+
+44. KUBERNETES
+==============
+
+Chỉ triển khai Kubernetes khi Docker version đã ổn định.
+
+Phải học:
+- Deployment
+- Service
+- ConfigMap
+- Secret
+- Ingress
+- Readiness Probe
+- Liveness Probe
+- Resource Request
+- Resource Limit
+- HPA
+- Rolling Update
+
+45. INFRASTRUCTURE AS CODE
+==========================
+
+Sử dụng Terraform để mô tả infrastructure production/staging.
+
+Infrastructure configuration phải version-controlled.
+
+46. DOCUMENTATION
+=================
+
+Project phải có:
+README.md
+
+docs/
+- requirements.md
+- architecture.md
+- erd.md
+- api.md
+- security.md
+- deployment.md
+- testing.md
+- adr/
+
+ADR ví dụ:
+- ADR-001: Why PostgreSQL?
+- ADR-002: Why Modular Monolith First?
+- ADR-003: Why sqlc instead of ORM?
+- ADR-004: Inventory concurrency strategy
+- ADR-005: RabbitMQ vs Kafka
+
+47. QUY TẮC KIẾN TRÚC
+=====================
+
+Mỗi module sở hữu dữ liệu của mình.
+
+Catalog owns:
+- products
+- skus
+- categories
+
+Inventory owns:
+- inventory
+- reservations
+- stock_movements
+
+Order owns:
+- orders
+- order_items
+- order_status_history
+
+Payment không được tự UPDATE orders SET status='PAID'.
+Payment phải thông báo cho Order qua application boundary/event phù hợp.
+
+48. QUY TẮC ENGINEERING
+=======================
+
+Không được:
+- Copy architecture mà không hiểu
+- Tạo interface cho mọi struct
+- Tạo microservice quá sớm
+- Dùng goroutine cho mọi operation
+- Dùng Redis làm source of truth tùy tiện
+- Retry mọi error
+- Bỏ qua database constraints
+- Hardcode secrets
+- Log password/token
+- Tin dữ liệu từ client
+
+Mỗi quyết định quan trọng phải trả lời được:
+- Why?
+- What can fail?
+- What happens when it fails?
+- How do we test it?
+
+49. ROADMAP
+===========
+
+Phase 1 — Architecture & Go Foundation
+- requirements
+- system context
+- actors
+- module boundaries
+- data ownership
+- Go project bootstrap
+- configuration
+- logging
+- HTTP server
+- graceful shutdown
+- health endpoints
+- ERD draft
+- API contract
+
+Phase 2 — Identity & Security Foundation
+- User
+- Authentication
+- JWT
+- Refresh token rotation
+- Session
+- RBAC
+- Ownership authorization
+- Password reset
+- Email verification
+- Redis rate limiter
+- Audit logging
+
+Phase 3 — Seller & Catalog
+- Seller
+- Shop
+- Product
+- Variant
+- SKU
+- Category
+- Brand
+- Product image
+- MinIO
+- Pagination/filtering
+- ElasticSearch
+
+Phase 4 — Cart & Inventory
+- Cart
+- Inventory
+- Warehouse
+- Reservation
+- Reservation expiration
+- Atomic stock operation
+- Concurrency testing
+- Stock movement ledger
+
+Phase 5 — Order & Checkout
+- Order
+- OrderItem
+- Snapshot
+- State machine
+- Voucher
+- Checkout
+- Transaction boundaries
+- Failure handling
+
+Phase 6 — Payment & Idempotency
+- Mock Payment Provider
+- Payment lifecycle
+- Webhook
+- Signature verification
+- Replay protection
+- Idempotency-Key
+- Duplicate webhook
+- Reconciliation
+
+Phase 7 — Event-Driven Architecture
+- RabbitMQ
+- Domain events
+- Transactional Outbox
+- Outbox worker
+- Idempotent consumers
+- Inbox Pattern
+- Retry
+- DLQ
+- Saga
+- Compensating transactions
+
+Phase 8 — Performance & Observability
+- Redis caching
+- Cache invalidation
+- OpenTelemetry
+- Prometheus
+- Grafana
+- Loki
+- Distributed tracing
+- Query optimization
+- EXPLAIN ANALYZE
+
+Phase 9 — Production Testing
+- Integration tests
+- Concurrency tests
+- Security tests
+- Load tests
+- Chaos tests
+- Failure injection
+- Performance profiling
+- Bottleneck analysis
+
+Phase 10 — Deployment & Production Hardening
+- Docker
+- CI/CD
+- Kubernetes
+- Helm
+- Terraform
+- Secret management
+- Horizontal scaling
+- Rolling deployment
+- Backup/recovery
+- Production checklist
+
+50. DEFINITION OF DONE
+======================
+
+Inventory:
+stock >= 0 trong mọi concurrency test.
+
+Payment:
+one successful payment -> one business payment effect
+
+Duplicate webhook không gây double processing.
+
+Order:
+State transition luôn hợp lệ.
+
+Idempotency:
+same request + same Idempotency-Key -> same business result
+
+Events:
+Duplicate delivery không tạo duplicate business operation.
+
+Failure:
+Service crash không làm mất business-critical operation đã commit.
+
+Security:
+User/Seller không truy cập hoặc chỉnh sửa tài nguyên không thuộc quyền của mình.
+
+Observability:
+Có thể xác định nguyên nhân của:
+- slow request
+- failed checkout
+- failed payment
+- consumer failure
+- database bottleneck
+
+51. MỤC TIÊU CUỐI CÙNG
+======================
+
+Sau khi hoàn thành Nexus Commerce, developer phải có khả năng giải thích và triển khai:
+- Go backend architecture
+- PostgreSQL transactions
+- MVCC
+- Database locking
+- Concurrency control
+- Distributed systems
+- Idempotency
+- Event-driven architecture
+- Saga
+- Transactional Outbox
+- Reliable messaging
+- Caching
+- Rate limiting
+- Authentication
+- Authorization
+- Application security
+- Observability
+- Load testing
+- Failure testing
+- Docker
+- Kubernetes
+- CI/CD
+- Infrastructure as Code
+
+Đây không phải "Website bán hàng bằng Go", mà là:
+Production-Grade Distributed E-Commerce Backend built with Go
+
+52. PHƯƠNG PHÁP THỰC HIỆN
+=========================
+
+Không implement toàn bộ specification cùng lúc.
+
+Mỗi Phase được chia thành engineering tickets.
+
+Ví dụ:
+ECOM-INV-07
+Atomic Inventory Reservation
+
+Requirement:
+Stock = 50
+500 concurrent reservation requests
+
+Acceptance Criteria:
+- Exactly <= 50 successful reservations
+- Inventory never becomes negative
+- Operation is transaction-safe
+- Multiple API instances remain safe
+- Integration test exists
+- Concurrency test exists
+
+Developer phải tự:
+Research -> Design -> Implement -> Test -> Benchmark -> Code Review
+
+Không chuyển sang ticket tiếp theo chỉ vì code chạy được.
+
+Mỗi ticket phải được review về:
+- Correctness
+- Security
+- Concurrency
+- Transaction boundary
+- Failure handling
+- Performance
+- Maintainability
+- Testability
+- Observability
+
+Mục tiêu của đồ án không chỉ là hoàn thành sản phẩm.
+Mục tiêu là học cách thiết kế, xây dựng, phá thử, quan sát, sửa và vận hành một backend lớn bằng Go như một hệ thống production thực tế.
