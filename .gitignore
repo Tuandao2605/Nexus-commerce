@@ -1,0 +1,30 @@
+# Go build and test artifacts
+/bin/
+/build/
+/dist/
+/coverage/
+*.test
+*.out
+coverage.*
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+/tmp/
+/temp/
+*.swp
+*.swo
+*~
+
+# IDE and OS metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local Codex runtime state; project skills remain tracked in .agents/
+.codex/

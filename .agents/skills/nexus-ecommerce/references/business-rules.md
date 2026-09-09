@@ -39,9 +39,13 @@ AVAILABLE -> RESERVED -> COMMITTED/SOLD
 ## Cart
 
 - Cart items reference SKUs and quantities.
+- V1 quantity is `1..99` per SKU.
 - A cached/displayed Cart price is never a purchase source of truth.
 - Checkout reloads current SKU price, active status, availability, and relevant Catalog data.
-- Checkout clears only selected purchased items, after Order persistence succeeds.
+- Checkout clears only selected purchased items after Order and PaymentTransaction
+  initialization succeed.
+- A partial checkout leaves the Cart active when unselected items remain; the
+  Cart becomes checked out only when empty.
 - A price/status change is surfaced through a stable checkout conflict; the client does not force its stale value.
 
 ## Voucher
@@ -61,16 +65,18 @@ selected Cart items
   -> validate/calculate Voucher
   -> reserve Inventory (15-minute TTL)
   -> persist Order and snapshots
-  -> clear selected Cart items
   -> initialize Payment
+  -> clear selected Cart items
 ```
 
 Critical rules:
 
-- `Idempotency-Key` prevents duplicate Order and Payment creation.
+- `checkout_reference_id` prevents duplicate Order hierarchy; external
+  `Idempotency-Key` is scoped by actor + operation and compared by request hash.
 - Server computes prices, discounts, totals, actor, shop, and address ownership.
-- Reservation failure creates no Order.
-- Order persistence failure triggers immediate release; TTL expiry recovers from a process crash before release.
+- Inventory reservation failure releases any Voucher hold and creates no Order.
+- Order/Payment initialization failure triggers immediate release of both holds;
+  TTL expiry recovers from a process crash before release.
 - Payment failure/timeout cannot reserve inventory forever.
 - Each step has a defined timeout and typed failure; retries are bounded and only for safe/transient operations.
 
@@ -78,12 +84,11 @@ Critical rules:
 
 Order owns its entity, items, status history, snapshots, and every status transition. Payment cannot update Order tables.
 
-The requirements and architecture notes currently use different pre-payment names:
+V1 stores both Parent and Seller Orders initially as `awaiting_payment`.
+`CREATED` is a creation event, not a stored status, and settlement success remains
+Payment-owned rather than adding a duplicate `paid` Order state.
 
-- requirements: `CREATED -> AWAITING_PAYMENT -> PAID`;
-- architecture V2 checkout: create as `PENDING_PAYMENT`.
-
-Do not implement both aliases accidentally. Before the first Order migration/domain constants, finalize one state vocabulary in the API/domain documentation or an ADR. Regardless of names:
+Rules:
 
 - invalid transitions are rejected;
 - repeated transition/event handling is idempotent;
@@ -100,7 +105,13 @@ Order snapshots must reconstruct history without live lookups. Snapshot product,
 - Webhook processing verifies signature and replay protection, deduplicates provider events, and is idempotent.
 - One provider success produces exactly one payment business effect: no double charge, inventory commit, Order transition, notification, refund, or accounting entry.
 - Payment announces `PaymentSucceeded`/`PaymentFailed` through a durable boundary/event. Order consumes and performs its own valid transition.
+- In V1's shared PostgreSQL, timely-success commerce finalization commits
+  Inventory, Voucher, Order histories, and required outbox records in one local
+  transaction through owner-module methods.
 - Delayed webhook and reconciliation use the same state machine and deduplication rules.
+- Payment/provider expiry cannot outlive Inventory/Voucher holds. A success after
+  the shared deadline never fulfills the Order and goes through idempotent
+  refund/reconciliation.
 
 ## Event Effects
 
@@ -145,5 +156,6 @@ Authorization/history:
 ## Repository Sources
 
 - `notes/architect.md`: exact ownership, checkout order, 15-minute reservation, compensation, snapshots, and Payment-to-Order boundary.
-- `docs/data-003b-inventory.md`: Product/Variant/SKU, seller/shop, lifecycle, price, tenant, and archive decisions.
+- `docs/data-003b-seller-catalog.md`: Product/Variant/SKU, seller/shop, lifecycle, price, tenant, and archive decisions.
+- `docs/erd.md`: reconciled cross-domain invariants and resolution status.
 - `nexus_commerce_golang_requirements.txt`: Inventory, Cart, Voucher, Order, Payment, idempotency, event, and test requirements.

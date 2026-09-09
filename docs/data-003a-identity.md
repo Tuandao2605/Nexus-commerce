@@ -1,5 +1,7 @@
 # ECOM-DATA-003A — Identity Domain Model
 
+> Status: FINAL DESIGN — reconciled with DATA-003G remediation
+
 ## Scope
 
 DATA-003A thiết kế bốn bảng:
@@ -429,6 +431,23 @@ Database không cố kiểm tra password hash cryptographically.
 
 Việc verify hash thuộc Auth service.
 
+Credential timestamps phải có chronology hợp lệ:
+
+```sql
+CHECK (updated_at >= created_at)
+```
+
+```sql
+CHECK (
+    email_verified_at IS NULL
+    OR email_verified_at >= created_at
+)
+```
+
+```sql
+CHECK (password_changed_at >= created_at)
+```
+
 ---
 
 ## Indexes
@@ -579,19 +598,14 @@ CHECK (
 
 ## Indexes
 
-### Load user sessions
-
-```sql
-CREATE INDEX idx_sessions_user_id
-ON sessions(user_id);
-```
-
 ### Active/revoked session queries
 
 ```sql
 CREATE INDEX idx_sessions_user_revoked_expires
 ON sessions(user_id, revoked_at, expires_at);
 ```
+
+Composite index này có leading column `user_id`, nên cũng phục vụ lookup toàn bộ session của một User. Không tạo thêm `idx_sessions_user_id` trùng prefix.
 
 Useful for:
 
@@ -1248,8 +1262,6 @@ updated_at          TIMESTAMPTZ
 ```text
 credentials.email
     UNIQUE
-
-sessions.user_id
 
 sessions(user_id, revoked_at, expires_at)
 

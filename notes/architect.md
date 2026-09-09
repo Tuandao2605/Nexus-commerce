@@ -1,8 +1,13 @@
 ===============================================================================
-                       SYSTEM ARCHITECTURE DOCUMENTATION (V2)
+              SYSTEM ARCHITECTURE DOCUMENTATION (CORE — REVISION 2)
                              PROJECT: NEXUS-COMMERCE
                              TICKET: ECOM-ARCH-002
 ===============================================================================
+
+STATUS NOTE: Đây là core/V1 architecture baseline, trong đó “V2” là revision
+của tài liệu ECOM-ARCH-002, không phải roadmap `docs/nexus-commerce-v2.md`.
+DATA-003A → DATA-003F và `docs/erd.md` là specification chi tiết mới hơn; khi có
+khác biệt về schema/lifecycle, các DATA documents đã reconciled được ưu tiên.
 
 1. OVERVIEW & DESIGN PRINCIPLES
 -------------------------------------------------------------------------------
@@ -124,7 +129,7 @@ Sơ đồ phụ thuộc giữa 10 Modules (Đảm bảo không có Circular Depe
                               |      |
                               v      v
                            +------------+
-                           |   Order    | <======= (Async Event: OrderPaid / PaymentFailed)
+                           |   Order    | <======= (Async Event: PaymentSucceeded / PaymentFailed)
                            +------------+                               ^
                             /    |     \                                |
                    (Sync)  /     |      \ (Sync)                        |
@@ -150,7 +155,9 @@ Bản chất giao tiếp (Communication Patterns):
 5. Order (CheckoutService) -> Cart, Catalog, Voucher, Inventory, Payment (Synchronous Orchestration):
    Checkout process cần phản hồi tức thì để xác nhận đơn hàng thành công hay thất bại.
 6. Payment -> Order (Asynchronous Domain Event - `PaymentSucceeded` / `PaymentFailed`):
-   Payment KHÔNG gọi trực tiếp Order để update DB. Payment phát ra Event, Order lắng nghe và tự thực hiện State Transition sang PAID.
+   Payment KHÔNG gọi trực tiếp Order để update DB. Payment phát Event; Order tự
+   transition từ `awaiting_payment` sang `confirmed` khi success hợp lệ trước
+   hold deadline. Payment settlement vẫn là source of truth của Payment Module.
 7. Order / Payment / Auth -> Notification (Asynchronous Domain Events):
    Các module phát event, Notification module lắng nghe và gửi Mail/Push bất đồng bộ.
 
@@ -185,27 +192,39 @@ Customer    CheckoutService(Order)    Cart     Catalog    Voucher   Inventory   
    |                 |    b. Safety Net: TTL 15m Expiration Worker                |           |
    |<-- Return Err --|<-- Return Failure ACK --------------------------------------|           |
    |                 |                                                                         |
-   |                 |-- 7. ClearSelectedItems -> Cart                                         |
-   |                 |-- 8. CreateTransaction ------------------------------------------------>|
+   |                 |-- 7. CreateTransaction ------------------------------------------------>|
+   |                 |-- 8. ClearSelectedItems -> Cart                                         |
    |<-- Order OK ----|<-- Return PaymentURL / QR Code -----------------------------------------|
 
 Chi tiết các bước thực hiện:
-- Step 1 (Initiation): Customer chọn sản phẩm và bấm "Đặt hàng". Request chứa `CartItemIDs`, `VoucherID`, `AddressID`.
+- Step 1 (Initiation): Customer chọn sản phẩm và bấm "Đặt hàng". Request chứa
+  `CartItemIDs`, `CheckoutReferenceID`, `VoucherID`, `AddressID`.
 - Step 2 (Fetch Cart): CheckoutService đọc danh sách `SKU_ID` và `Quantity` từ Cart Module.
 - Step 3 (Validate Catalog): CheckoutService gọi Catalog lấy giá niêm yết hiện tại và trạng thái SKU. Nếu đổi giá hoặc ngưng bán -> Hủy Checkout.
-- Step 4 (Validate Voucher): CheckoutService gọi Voucher Module kiểm tra điều kiện mã giảm giá. Nếu không hợp lệ -> Hủy Checkout.
+- Step 4 (Validate/Reserve Voucher): CheckoutService kiểm tra điều kiện rồi
+  reserve usage với cùng deadline Inventory. Voucher chưa commit ở bước này.
 - Step 5 & Failure Path 1 (Reserve Inventory): CheckoutService gọi Inventory để giữ chỗ tồn kho với TTL = 15 phút.
-  + Failure Path 1: Nếu tồn kho khả dụng không đủ -> Dừng ngay lập tức, báo lỗi hết hàng. Không ghi DB Order.
+  + Failure Path 1: Nếu tồn kho khả dụng không đủ -> release Voucher hold, dừng
+    và báo lỗi hết hàng. Không ghi DB Order.
 - Step 6 & Failure Path 2 (Create Order & Compensation):
-  CheckoutService tạo record Order (PENDING_PAYMENT) kèm dữ liệu Snapshot.
+  CheckoutService tạo Parent + Seller Orders ở `awaiting_payment` kèm dữ liệu Snapshot.
   + Failure Path 2 (Cơ chế đền bù kép):
     1. Primary Compensation (Trực tiếp): Nếu ghi DB Order thất bại (Validation error, DB Deadlock...),
-       CheckoutService gọi ngay `Inventory.ReleaseReservation(ReservationID)`.
+       CheckoutService gọi ngay Inventory và Voucher release idempotently.
     2. Safety Mechanism (Phòng ngừa Crash): Nếu API Process bị crash/sập nguồn ngay sau bước Reserve Inventory
        mà bước Primary Compensation chưa kịp chạy, Worker chạy ngầm của Inventory sẽ tự động quét
        và giải phóng các Reservation đã hết hạn TTL (15 phút).
-- Step 7 (Cleanup Cart): Ghi DB Order thành công, CheckoutService xóa các items đã mua khỏi Cart.
-- Step 8 (Init Payment): CheckoutService gọi Payment Module sinh giao dịch thanh toán (Momo/VNPay QR) và trả về `PaymentURL` cho Customer.
+- Step 7 (Init Payment): CheckoutService tạo/reuse PaymentTransaction; expiry của
+  provider URL không được muộn hơn Inventory/Voucher hold deadline.
+- Nếu Step 7 thất bại, cancel hierarchy đang `awaiting_payment` và release cả hai
+  hold; TTL là safety net nếu process crash.
+- Step 8 (Cleanup Cart): Sau khi Order + PaymentTransaction initialize thành công,
+  xóa đúng selected items. Cart còn item thì vẫn active; chỉ checked_out khi rỗng.
+- PaymentSucceeded đúng hạn commit Inventory/Voucher và Order tự confirm qua
+  boundary idempotent. Với shared PostgreSQL của V1, ba commerce effects này và
+  histories/outbox cần commit trong một local finalization transaction qua
+  owner-module methods. Late success sau deadline không fulfill; Payment phải
+  refund/reconcile và Order đang chờ bị cancel.
 
 
 6. SNAPSHOT DESIGN SPECIFICATION
@@ -218,15 +237,17 @@ từ dữ liệu Snapshot của chính nó, mà không đòi hỏi thông tin li
 vẫn được lưu trữ để phục vụ mục đích Traceability & Audit Trail.
 
 Cấu trúc lưu trữ chuẩn cho `order_items`:
-- `id`: BIGINT / UUID (Primary Key)
-- `order_id`: BIGINT / UUID (FK -> orders)
-- `sku_id`: BIGINT (FK Reference đến catalog_skus - dùng để trace/audit)
-- `product_id`: BIGINT (FK Reference đến catalog_products - dùng để trace)
+- `id`: UUIDv7 (Primary Key)
+- `order_id`: UUID (FK -> orders)
+- `sku_id`: UUID (FK đến skus - dùng để trace/audit)
+- `variant_id`: UUID (FK đến product_variants - dùng để trace)
+- `product_id`: UUID (trace qua Product/Variant/SKU composite chain)
 - `product_name_snapshot`: VARCHAR(255) (Tên sản phẩm tại thời điểm mua)
 - `sku_name_snapshot`: VARCHAR(255) (Tên biến thể: Màu, Size tại thời điểm mua)
-- `unit_price_snapshot`: DECIMAL(12, 2) (Giá bán thực tế tại thời điểm mua)
-- `original_price_snapshot`: DECIMAL(12, 2) (Giá niêm yết tại thời điểm mua)
-- `quantity`: INT (Số lượng mua)
+- `attributes_snapshot`: JSONB object (thuộc tính biến thể lúc mua)
+- `unit_price_amount`: BIGINT minor units (Giá bán thực tế tại thời điểm mua)
+- `original_price_amount`: BIGINT minor units nếu business cần lưu giá niêm yết
+- `quantity`: BIGINT, CHECK 1..99
 
 Địa chỉ giao hàng trong `orders`:
 - `shipping_address_snapshot`: JSONB / Embedded Columns (Tên người nhận, SĐT, Địa chỉ chi tiết)
@@ -254,7 +275,8 @@ Cấu trúc lưu trữ chuẩn cho `order_items`:
 6. Can Payment update Order directly?
    -> NO. Payment KHÔNG ĐƯỢC phép update bảng Order trực tiếp.
    -> Payment chỉ báo cáo kết quả thanh toán thông qua Boundary / Domain Event (`PaymentSucceeded`).
-      Order Module nhận Event này và tự thực hiện State Transition hợp lệ sang `PAID`.
+      Order Module nhận Event này và tự thực hiện transition hợp lệ sang
+      `confirmed`; trạng thái settlement thành công vẫn thuộc Payment Module.
 
 7. Can Seller update Inventory directly?
    -> NO. Seller KHÔNG ĐƯỢC phép ghi trực tiếp vào DB của Inventory.

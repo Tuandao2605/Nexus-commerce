@@ -6,7 +6,9 @@ Use this reference for PostgreSQL schema work, sqlc queries, repository methods,
 
 The repository has ERD/design documents but no `migrations/`, SQL queries, sqlc config, or PostgreSQL adapter yet. Treat schema text as a target until a migration implements it. Once migrations exist, migrations plus executable database tests are the implemented source of truth.
 
-`docs/data-003c-inventory.md` is titled `ECOM-DATA-003B`, duplicates part of the Seller/Catalog design, and ends mid-table. Use the complete `docs/data-003b-inventory.md` for exact Seller/Catalog details unless the documentation is explicitly reconciled.
+DATA-003A → DATA-003F have been reconciled by the DATA-003G review. Treat
+`docs/erd.md` as the cross-domain review and each DATA document as the detailed
+design target until migrations exist.
 
 ## Established Conventions
 
@@ -40,7 +42,9 @@ Seller/Catalog:
 - SKU owns current price. Product and Variant do not.
 - SKU contains no stock quantity. Inventory owns stock by `sku_id`.
 
-For exact columns, lifecycle checks, and indexes, read `docs/data-003a-inventory.md` and the complete `docs/data-003b-inventory.md`.
+For exact columns, lifecycle checks, and indexes, read
+`docs/data-003a-identity.md`, `docs/data-003b-seller-catalog.md`, and the relevant
+DATA-003C → DATA-003F document.
 
 ## Transaction Boundaries
 
@@ -54,7 +58,12 @@ Examples:
 - Order plus OrderItems, status history, idempotency result, and any owner-module outbox record that must commit with it.
 - Payment webhook result, deduplication record, payment state transition, and outbox record.
 
-Cross-module checkout is an application workflow, not a single assumed distributed transaction. Inventory reservation followed by Order failure uses immediate compensation plus reservation TTL recovery.
+Cross-module checkout is an application workflow, not a transaction that spans
+provider/network calls. Inventory reservation followed by Order failure uses
+immediate compensation plus TTL recovery. In V1's shared PostgreSQL, the
+post-PaymentSucceeded commerce finalization (Inventory commit + Voucher commit +
+Order confirmation/history/outbox) uses one local transaction through the owner
+module methods so those database effects cannot partially commit.
 
 ## Concurrency
 
@@ -101,7 +110,8 @@ Never edit an already-applied shared migration to disguise a new change; add a n
 
 ## Repository Sources
 
-- `docs/data-003a-inventory.md`: Identity ERD V1.
-- `docs/data-003b-inventory.md`: complete Seller/Catalog ERD V1.
+- `docs/data-003a-identity.md`: Auth/User ERD V1.
+- `docs/data-003b-seller-catalog.md`: Seller/Catalog ERD V1.
+- `docs/erd.md`: reconciled cross-domain ERD review.
 - `notes/architect.md`: ownership and checkout compensation decisions.
 - `nexus_commerce_golang_requirements.txt`: PostgreSQL, pgx, sqlc, golang-migrate, concurrency, outbox, and testing targets.

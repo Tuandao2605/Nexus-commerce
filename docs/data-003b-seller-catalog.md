@@ -1,5 +1,7 @@
 # ECOM-DATA-003B — Seller & Catalog Domain Model
 
+> Status: FINAL DESIGN — reconciled with DATA-003G remediation
+
 ## 1. Scope
 
 DATA-003B thiết kế tám bảng:
@@ -461,7 +463,7 @@ CHECK (
 CHECK ( email IS NULL
         OR (
              email = lower(btrim(email))
-            AND char_length(email) BETWEEN 3 AND 254 \
+            AND char_length(email) BETWEEN 3 AND 254
             )
      )
 ```
@@ -874,6 +876,15 @@ VALUES (
 COMMIT;
 ```
 
+Owner transfer/revocation cũng phải chạy trong một transaction và lock Shop cùng
+membership owner hiện tại. Successor phải được activate trước khi owner cũ bị
+demote/revoke; transaction rollback toàn bộ nếu không thể duy trì một active
+owner. Partial unique index bảo vệ **at most one** active owner, còn transaction
+workflow bảo vệ **at least one** active owner cho mọi Shop chưa đóng.
+
+Mọi mutation membership phải authorize theo chính `shop_id` trong transaction;
+role Seller toàn cục không thay thế kiểm tra membership của Shop đích.
+
 ---
 
 # 7. TABLE: categories
@@ -1111,7 +1122,11 @@ Không tự chặn:
 A → B → C → A
 ```
 
-Application phải kiểm tra ancestor graph khi move category.
+Application phải kiểm tra ancestor graph khi move category. Việc kiểm tra và
+`UPDATE parent_id` phải nằm trong cùng transaction, đồng thời serialize các move
+có thể giao nhau bằng row/advisory lock theo category root. Không dùng flow
+`read ancestors → commit → update` vì hai move concurrent có thể cùng vượt qua
+validation rồi tạo cycle.
 
 ---
 
@@ -1618,7 +1633,12 @@ Database enforce tenant consistency.
 
 ```sql
 UNIQUE (id, shop_id)
+
+UNIQUE (id, product_id, shop_id)
 ```
+
+Key thứ hai cho phép Order snapshot reference đúng Product + Variant chain,
+không chỉ cùng tenant.
 
 Variant name case-insensitive unique trong Product:
 
@@ -1843,6 +1863,15 @@ SKU.currency_code = Shop.currency_code
 ---
 
 ## SKU Code Unique Scope
+
+Để Cart/Inventory/Order dùng tenant-safe composite FK và Order giữ đúng Variant
+chain:
+
+```sql
+UNIQUE (id, shop_id)
+
+UNIQUE (id, variant_id, shop_id)
+```
 
 Quyết định:
 
@@ -2465,6 +2494,7 @@ INDEX(status, created_at)
 product_variants
 ──────────────────────────────
 UNIQUE(id, shop_id)
+UNIQUE(id, product_id, shop_id)
 UNIQUE(product_id, lower(trim(name)))
 
 INDEX(product_id, status)
@@ -2474,6 +2504,8 @@ INDEX(shop_id)
 skus
 ──────────────────────────────
 UNIQUE(shop_id, sku_code)
+UNIQUE(id, shop_id)
+UNIQUE(id, variant_id, shop_id)
 
 INDEX(variant_id, status)
 INDEX(shop_id, status)

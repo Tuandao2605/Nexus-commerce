@@ -90,6 +90,6 @@ Cover:
 
 ## Repository Sources
 
-- `docs/data-003a-inventory.md`: Auth/User ownership and identity invariants.
-- `docs/data-003b-inventory.md`: Seller/Shop membership model.
+- `docs/data-003a-identity.md`: Auth/User ownership and identity invariants.
+- `docs/data-003b-seller-catalog.md`: Seller/Shop membership model.
 - `nexus_commerce_golang_requirements.txt`: security threats, RBAC plus ownership, webhook security, rate limiting, audit, and logging targets.

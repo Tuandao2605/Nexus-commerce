@@ -60,20 +60,27 @@ Do not place cross-module infrastructure calls inside the `Order` entity. The en
 
 ## Checkout Sequence
 
-1. Accept selected `CartItemIDs`, optional `VoucherID`, and `AddressID`.
-2. Load selected cart items.
+1. Accept selected `CartItemIDs`, `checkout_reference_id`, optional `VoucherID`, and `AddressID`.
+2. Resolve an existing checkout correlation first, then lock/load selected cart items.
 3. Reload SKU status and current price from Catalog. Reject changed, inactive, or unavailable SKUs according to the API contract.
-4. Validate and calculate the voucher through Voucher.
-5. Reserve all required SKU quantities through Inventory with a 15-minute TTL.
-6. Persist the Order and immutable item/address snapshots.
-7. Clear only the purchased cart items after Order persistence succeeds.
-8. Create the Payment transaction and return its URL or QR information.
+4. Validate/calculate and reserve the voucher through Voucher.
+5. Reserve all required SKU quantities through Inventory with the same 15-minute deadline.
+6. Persist the Order hierarchy in `awaiting_payment` with immutable snapshots.
+7. Create/reuse the Payment transaction with expiry no later than the hold deadline.
+8. Clear only purchased items; keep Cart active if items remain, otherwise mark checked out.
 
 Failure rules:
 
-- If reservation fails, create no Order.
-- If reservation succeeds but Order persistence fails, request immediate release. Reservation expiry is the crash-recovery safety net.
-- A payment initialization or result failure must not leave stock reserved forever; handle release/expiry according to the finalized Order/Payment transition.
+- If Inventory reservation fails after Voucher reservation, release the Voucher
+  usage immediately; create no Order.
+- If Order persistence fails, request immediate release of both holds. Their
+  expiry workers are the crash-recovery safety net.
+- Payment initialization failure cancels any created awaiting-payment hierarchy
+  and releases both holds. A later payment-attempt failure may retain them only
+  while the shared retry deadline is still valid.
+- A timely PaymentSucceeded commits both holds and confirms Order through owner
+  module commands in one V1 shared-PostgreSQL finalization transaction. Late
+  success is refund/reconciliation and never resurrects expired holds.
 - Do not pretend that cross-module calls form one ACID transaction. Use local transactions, idempotency, compensation, and durable events.
 
 ## Events and Reliability

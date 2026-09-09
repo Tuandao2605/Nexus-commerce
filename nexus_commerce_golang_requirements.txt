@@ -102,9 +102,27 @@ Database
 - PostgreSQL
 - pgx
 - sqlc
+- GORM
 - golang-migrate
 
-Ưu tiên SQL trực tiếp thay vì ORM để học:
+Chiến lược data access ưu tiên pgx + sqlc:
+- pgx + sqlc là data-access mặc định cho repository và transaction.
+- SQL được viết tường minh; sqlc sinh Go code type-safe, còn pgx/pgxpool quản lý
+  connection, transaction và PostgreSQL-specific behavior.
+- GORM vẫn có trong stack nhưng là lựa chọn phụ, chỉ dùng cho CRUD đơn giản,
+  internal tooling hoặc admin flow khi có lý do rõ ràng và có test.
+- Inventory reservation, Voucher quota, Checkout finalization, Payment,
+  Refund, Outbox/Inbox và các mutation chống race phải có SQL/locking rõ ràng;
+  bắt buộc ưu tiên pgx + sqlc hoặc SQL trực tiếp, không phụ thuộc hành vi ORM
+  ngầm định.
+- Transaction mặc định dùng `pgx.Tx` và sqlc `WithTx`. Không trộn `*gorm.DB`
+  transaction với `pgx.Tx` trong cùng unit of work. Nếu một repository chọn
+  GORM, transaction của repository đó phải được cô lập và boundary phải rõ.
+- `golang-migrate` là source of truth cho schema migration. Không dùng GORM
+  `AutoMigrate` trong staging/production và không để application tự sửa schema
+  khi startup.
+
+Bắt buộc hiểu và sử dụng SQL trực tiếp:
 - SQL
 - transaction
 - indexes
@@ -683,6 +701,9 @@ Không sử dụng goroutine chỉ để chứng minh đang dùng Go.
 context.Context phải được propagate:
 HTTP -> Handler -> Service -> Repository -> PostgreSQL
 
+pgx/sqlc phải nhận request context trong mọi query/transaction. Repository phụ
+dùng GORM phải gọi `db.WithContext(ctx)`.
+
 Không tạo context.Background() tùy tiện trong request flow.
 
 Client disconnect hoặc deadline hết hạn phải có khả năng cancel downstream work.
@@ -692,6 +713,8 @@ Client disconnect hoặc deadline hết hạn phải có khả năng cancel down
 
 Phải nghiên cứu và sử dụng:
 - connection pooling
+- pgxpool và sqlc-generated queries
+- GORM session/model mapping khi dùng GORM cho flow phụ
 - transactions
 - indexes
 - constraints
@@ -705,6 +728,21 @@ Phải nghiên cứu và sử dụng:
 Sử dụng:
 - EXPLAIN
 - EXPLAIN ANALYZE
+
+Quy tắc khi sử dụng GORM như lựa chọn phụ:
+- Model phải map explicit table/column; không để convention ngầm làm thay đổi
+  schema contract trong migrations.
+- Dùng explicit `Select`/`Omit` cho mutation nhạy cảm để tránh mass assignment.
+- Không dùng `Save` hoặc association auto-save cho aggregate quan trọng nếu có
+  thể ghi ngoài ý muốn.
+- Kiểm soát `Preload`/join và query count; không chấp nhận N+1 query.
+- Mọi lỗi phải được map sang typed repository/domain error; không leak lỗi SQL
+  hoặc thông tin nhạy cảm ra API.
+- Query cần `FOR UPDATE`, conditional atomic update, advisory lock, CTE, batch,
+  hoặc deterministic lock ordering phải ưu tiên pgx/sqlc hoặc SQL trực tiếp và
+  có PostgreSQL integration/concurrency test.
+- Database constraints vẫn là lớp bảo vệ cuối cho FK, UNIQUE, CHECK, tenant,
+  money, quantity và lifecycle invariants.
 
 27. SECURITY
 ============
@@ -1045,7 +1083,7 @@ docs/
 ADR ví dụ:
 - ADR-001: Why PostgreSQL?
 - ADR-002: Why Modular Monolith First?
-- ADR-003: Why sqlc instead of ORM?
+- ADR-003: Why pgx + sqlc are primary, and where GORM is allowed
 - ADR-004: Inventory concurrency strategy
 - ADR-005: RabbitMQ vs Kafka
 
@@ -1110,6 +1148,8 @@ Phase 1 — Architecture & Go Foundation
 - health endpoints
 - ERD draft
 - API contract
+- PostgreSQL pgxpool và sqlc initialization
+- pgx/sqlc-first repository convention và GORM exception boundary
 
 Phase 2 — Identity & Security Foundation
 - User
