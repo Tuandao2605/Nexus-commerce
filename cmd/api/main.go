@@ -1,3 +1,4 @@
+// Command api là entrypoint khởi tạo cấu hình, PostgreSQL và HTTP server của Nexus Commerce.
 package main
 
 import (
@@ -11,6 +12,7 @@ import (
 	"nexus-commerce/internal/server"
 )
 
+// main tạo logger, chạy ứng dụng và kết thúc process với mã lỗi khi bootstrap hoặc server thất bại.
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
@@ -20,6 +22,7 @@ func main() {
 	}
 }
 
+// run sở hữu lifecycle ứng dụng: load config, kết nối PostgreSQL với timeout, chạy server và đóng pool khi dừng.
 func run(logger *slog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {

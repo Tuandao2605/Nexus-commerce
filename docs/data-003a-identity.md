@@ -1,6 +1,9 @@
 # ECOM-DATA-003A — Identity Domain Model
 
 > Status: FINAL DESIGN — reconciled with DATA-003G remediation
+>
+> Implementation: `ECOM-DB-004B` **PASS** — encoded by
+> `migrations/000001_identity.up.sql` and PostgreSQL integration tests.
 
 ## Scope
 
@@ -1291,4 +1294,5 @@ queryability
 
 thay vì chỉ thiết kế bốn bảng CRUD.
 
-Đây là ERD V1; chưa phải migration implementation.
+Đây là tài liệu thiết kế ERD V1. Migration implementation tương ứng nằm tại
+`migrations/000001_identity.up.sql` và đã PASS ở `ECOM-DB-004B`.

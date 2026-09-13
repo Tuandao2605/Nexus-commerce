@@ -1,3 +1,4 @@
+// Package config đọc biến môi trường và kiểm tra cấu hình cần thiết để ứng dụng khởi động an toàn.
 package config
 
 import (
@@ -25,6 +26,8 @@ type DatabaseConfig struct {
 	StartupTimeout    time.Duration
 }
 
+// Load đọc cấu hình HTTP và PostgreSQL từ biến môi trường.
+// Hàm dùng cổng mặc định 8080 khi PORT trống và trả lỗi nếu cấu hình database không hợp lệ.
 func Load() (Config, error) {
 	port := strings.TrimSpace(os.Getenv("PORT"))
 	if port == "" {
@@ -42,6 +45,7 @@ func Load() (Config, error) {
 	}, nil
 }
 
+// loadDatabaseConfig đọc các biến DATABASE_* và kiểm tra quan hệ giữa các thông số pool.
 func loadDatabaseConfig() (DatabaseConfig, error) {
 	databaseURL, err := requireEnv("DATABASE_URL")
 	if err != nil {
@@ -101,6 +105,7 @@ func loadDatabaseConfig() (DatabaseConfig, error) {
 	}, nil
 }
 
+// requireEnv trả về giá trị đã loại bỏ khoảng trắng hoặc báo lỗi khi biến môi trường bị thiếu.
 func requireEnv(key string) (string, error) {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
@@ -110,6 +115,7 @@ func requireEnv(key string) (string, error) {
 	return value, nil
 }
 
+// parseInt32Env đọc một biến môi trường bắt buộc và chuyển nó thành số nguyên int32.
 func parseInt32Env(key string) (int32, error) {
 	value, err := requireEnv(key)
 	if err != nil {
@@ -124,6 +130,7 @@ func parseInt32Env(key string) (int32, error) {
 	return int32(parsed), nil
 }
 
+// parsePositiveDurationEnv đọc duration theo cú pháp Go như 5s, 30m, 1h và yêu cầu giá trị lớn hơn 0.
 func parsePositiveDurationEnv(key string) (time.Duration, error) {
 	value, err := requireEnv(key)
 	if err != nil {

@@ -1,3 +1,4 @@
+// Package database khởi tạo và quản lý kết nối PostgreSQL bằng pgxpool.
 package database
 
 import (
@@ -9,6 +10,8 @@ import (
 	"nexus-commerce/internal/config"
 )
 
+// NewPool phân tích DATABASE_URL, áp dụng cấu hình pool và Ping PostgreSQL để xác nhận kết nối thật.
+// Pool được đóng trước khi trả lỗi nếu Ping thất bại; caller sở hữu và phải đóng pool khi thành công.
 func NewPool(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 	poolConfig, err := pgxpool.ParseConfig(cfg.URL)
 	if err != nil {

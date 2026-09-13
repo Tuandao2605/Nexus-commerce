@@ -1,3 +1,4 @@
+# File này cung cấp PostgreSQL local, persistent volume, các test database và healthcheck cho DB-004A/DB-004B.
 services:
   postgres:
     image: postgres:17-alpine

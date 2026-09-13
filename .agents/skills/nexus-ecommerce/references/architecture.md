@@ -4,7 +4,10 @@ Use this reference for module placement, cross-module calls, checkout orchestrat
 
 ## Implemented State and Target
 
-The repository currently contains a small Go 1.23 service using Chi, JSON `slog`, graceful shutdown, and `GET /health`. The domain modules and infrastructure below are the approved target, not evidence of implemented code.
+The repository currently contains a Go 1.23 service using Chi, JSON `slog`,
+graceful shutdown, `GET /health`, PostgreSQL through pgxpool, golang-migrate,
+and the implemented Identity schema. The remaining domain modules and
+infrastructure below are approved targets, not evidence of implemented code.
 
 Evolution path:
 

@@ -1,3 +1,4 @@
+// File này kiểm thử việc đọc cấu hình hợp lệ và các trường hợp cấu hình database phải bị từ chối.
 package config
 
 import (
@@ -6,6 +7,7 @@ import (
 	"time"
 )
 
+// TestLoad kiểm tra PORT mặc định/tùy chỉnh và toàn bộ quy tắc validation của DATABASE_*.
 func TestLoad(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -107,6 +109,7 @@ func TestLoad(t *testing.T) {
 	}
 }
 
+// setValidDatabaseEnv thiết lập một bộ biến môi trường hợp lệ làm dữ liệu nền cho từng test case.
 func setValidDatabaseEnv(t *testing.T) {
 	t.Helper()
 

@@ -1,3 +1,4 @@
+// File này kiểm thử parsing DSN và kết nối pgxpool với PostgreSQL test thật.
 package database
 
 import (
@@ -11,6 +12,7 @@ import (
 	"nexus-commerce/internal/config"
 )
 
+// TestNewPoolRejectsInvalidDSN xác nhận NewPool từ chối chuỗi kết nối sai cú pháp mà không trả pool.
 func TestNewPoolRejectsInvalidDSN(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -25,6 +27,7 @@ func TestNewPoolRejectsInvalidDSN(t *testing.T) {
 	}
 }
 
+// TestNewPoolIntegration kết nối TEST_DATABASE_URL và chạy SELECT 1 để kiểm tra toàn bộ đường kết nối.
 func TestNewPoolIntegration(t *testing.T) {
 	databaseURL := requireTestDatabaseURL(t)
 
@@ -46,6 +49,7 @@ func TestNewPoolIntegration(t *testing.T) {
 	}
 }
 
+// TestNewPoolIntegrationRejectsUnknownDatabase xác nhận NewPool báo lỗi khi database đích không tồn tại.
 func TestNewPoolIntegrationRejectsUnknownDatabase(t *testing.T) {
 	databaseURL := requireTestDatabaseURL(t)
 
@@ -68,6 +72,7 @@ func TestNewPoolIntegrationRejectsUnknownDatabase(t *testing.T) {
 	}
 }
 
+// requireTestDatabaseURL lấy URL database test; test sẽ fail ở chế độ bắt buộc và skip ở chế độ thường nếu URL thiếu.
 func requireTestDatabaseURL(t *testing.T) string {
 	t.Helper()
 
@@ -84,6 +89,7 @@ func requireTestDatabaseURL(t *testing.T) string {
 	return ""
 }
 
+// testDatabaseConfig tạo cấu hình pool nhỏ, có timeout rõ ràng để dùng thống nhất trong database tests.
 func testDatabaseConfig(databaseURL string) config.DatabaseConfig {
 	return config.DatabaseConfig{
 		URL:               databaseURL,

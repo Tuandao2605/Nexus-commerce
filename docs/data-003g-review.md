@@ -17,8 +17,9 @@ ghép DATA-003A → DATA-003F và kiểm tra các invariant xuyên module:
 - status ownership, lifecycle timestamps và critical indexes.
 
 Các finding ban đầu đã được sửa trực tiếp trong DATA documents và được ghi thành
-resolution trong `docs/erd.md`. Kết luận này là **design pass**; repository chưa
-có PostgreSQL migrations, sqlc repositories hay implementation cho các domain.
+resolution trong `docs/erd.md`. Kết luận này là **design pass**. Sau review,
+DB-004A đã tạo migration foundation và DB-004B đã triển khai Identity; các domain
+còn lại và sqlc repositories vẫn là target cho các ticket kế tiếp.
 
 ## Source-of-Truth Summary
 

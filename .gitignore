@@ -1,3 +1,5 @@
+# File này ngăn Git theo dõi build artifacts, secret local và metadata của công cụ phát triển.
+
 # Go build and test artifacts
 /bin/
 /build/
