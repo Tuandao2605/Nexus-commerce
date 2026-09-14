@@ -3,8 +3,6 @@ package database
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"strings"
 	"sync"
@@ -13,12 +11,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // TestIdentityMigrationCreatesExpectedObjects xác nhận migration đã tạo đủ bốn bảng và các index quan trọng của Identity.
 func TestIdentityMigrationCreatesExpectedObjects(t *testing.T) {
-	ctx, tx := beginIdentityTest(t)
+	ctx, tx := beginMigrationTest(t)
 
 	objects := []string{
 		"users",
@@ -46,7 +43,7 @@ func TestIdentityMigrationCreatesExpectedObjects(t *testing.T) {
 
 // TestIdentityMigrationUsesCanonicalTypesAndDeleteRules xác nhận UUID/TIMESTAMPTZ không có default sai và mọi Identity FK đều RESTRICT.
 func TestIdentityMigrationUsesCanonicalTypesAndDeleteRules(t *testing.T) {
-	ctx, tx := beginIdentityTest(t)
+	ctx, tx := beginMigrationTest(t)
 
 	uuidColumns := [][2]string{
 		{"users", "id"},
@@ -139,7 +136,7 @@ func TestIdentityMigrationUsesCanonicalTypesAndDeleteRules(t *testing.T) {
 
 // TestIdentityMigrationAcceptsValidRows xác nhận một User có credential, session và address hợp lệ có thể được lưu đầy đủ.
 func TestIdentityMigrationAcceptsValidRows(t *testing.T) {
-	ctx, tx := beginIdentityTest(t)
+	ctx, tx := beginMigrationTest(t)
 	userID := insertIdentityTestUser(t, ctx, tx)
 	now := time.Now().UTC().Truncate(time.Microsecond)
 
@@ -159,7 +156,7 @@ func TestIdentityMigrationAcceptsValidRows(t *testing.T) {
 			last_activity_at, expires_at, revoked_at
 		)
 		VALUES ($1, $2, '127.0.0.1', 'identity migration test', $3, $3, $4, NULL)
-	`, newIdentityTestUUID(t), userID, now, now.Add(time.Hour)); err != nil {
+	`, newMigrationTestUUID(t), userID, now, now.Add(time.Hour)); err != nil {
 		t.Fatalf("insert valid session: %v", err)
 	}
 
@@ -169,7 +166,7 @@ func TestIdentityMigrationAcceptsValidRows(t *testing.T) {
 			address_line1, province, country_code, is_default
 		)
 		VALUES ($1, $2, 'Home', 'Test User', '0900000000', '1 Test Street', 'Ha Noi', 'VN', true)
-	`, newIdentityTestUUID(t), userID); err != nil {
+	`, newMigrationTestUUID(t), userID); err != nil {
 		t.Fatalf("insert valid address: %v", err)
 	}
 }
@@ -185,40 +182,40 @@ func TestIdentityMigrationRejectsInvalidUsers(t *testing.T) {
 		{
 			name:    "blank display name",
 			query:   "INSERT INTO users (id, display_name) VALUES ($1, '   ')",
-			args:    func(t *testing.T) []any { return []any{newIdentityTestUUID(t)} },
+			args:    func(t *testing.T) []any { return []any{newMigrationTestUUID(t)} },
 			SQLCode: "23514",
 		},
 		{
 			name:    "unknown status",
 			query:   "INSERT INTO users (id, display_name, status) VALUES ($1, 'Test User', 'blocked')",
-			args:    func(t *testing.T) []any { return []any{newIdentityTestUUID(t)} },
+			args:    func(t *testing.T) []any { return []any{newMigrationTestUUID(t)} },
 			SQLCode: "23514",
 		},
 		{
 			name:    "deleted status without deleted timestamp",
 			query:   "INSERT INTO users (id, display_name, status) VALUES ($1, 'Test User', 'deleted')",
-			args:    func(t *testing.T) []any { return []any{newIdentityTestUUID(t)} },
+			args:    func(t *testing.T) []any { return []any{newMigrationTestUUID(t)} },
 			SQLCode: "23514",
 		},
 		{
 			name:    "active status with deleted timestamp",
 			query:   "INSERT INTO users (id, display_name, status, deleted_at) VALUES ($1, 'Test User', 'active', now())",
-			args:    func(t *testing.T) []any { return []any{newIdentityTestUUID(t)} },
+			args:    func(t *testing.T) []any { return []any{newMigrationTestUUID(t)} },
 			SQLCode: "23514",
 		},
 		{
 			name:    "updated before created",
 			query:   "INSERT INTO users (id, display_name, created_at, updated_at) VALUES ($1, 'Test User', now(), now() - interval '1 second')",
-			args:    func(t *testing.T) []any { return []any{newIdentityTestUUID(t)} },
+			args:    func(t *testing.T) []any { return []any{newMigrationTestUUID(t)} },
 			SQLCode: "23514",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, tx := beginIdentityTest(t)
+			ctx, tx := beginMigrationTest(t)
 			_, err := tx.Exec(ctx, test.query, test.args(t)...)
-			assertIdentitySQLState(t, err, test.SQLCode)
+			assertMigrationSQLState(t, err, test.SQLCode)
 		})
 	}
 }
@@ -226,17 +223,17 @@ func TestIdentityMigrationRejectsInvalidUsers(t *testing.T) {
 // TestIdentityMigrationEnforcesCredentialInvariants kiểm tra email canonical/unique, một credential mỗi User và FK ownership.
 func TestIdentityMigrationEnforcesCredentialInvariants(t *testing.T) {
 	t.Run("email must be canonical", func(t *testing.T) {
-		ctx, tx := beginIdentityTest(t)
+		ctx, tx := beginMigrationTest(t)
 		userID := insertIdentityTestUser(t, ctx, tx)
 		_, err := tx.Exec(ctx, `
 			INSERT INTO credentials (user_id, email, password_hash)
 			VALUES ($1, 'User@Example.COM', '$argon2id$test-hash')
 		`, userID)
-		assertIdentitySQLState(t, err, "23514")
+		assertMigrationSQLState(t, err, "23514")
 	})
 
 	t.Run("email must be unique", func(t *testing.T) {
-		ctx, tx := beginIdentityTest(t)
+		ctx, tx := beginMigrationTest(t)
 		firstUserID := insertIdentityTestUser(t, ctx, tx)
 		secondUserID := insertIdentityTestUser(t, ctx, tx)
 		email := identityTestEmail(firstUserID)
@@ -252,11 +249,11 @@ func TestIdentityMigrationEnforcesCredentialInvariants(t *testing.T) {
 			INSERT INTO credentials (user_id, email, password_hash)
 			VALUES ($1, $2, '$argon2id$second')
 		`, secondUserID, email)
-		assertIdentitySQLState(t, err, "23505")
+		assertMigrationSQLState(t, err, "23505")
 	})
 
 	t.Run("one credential per user", func(t *testing.T) {
-		ctx, tx := beginIdentityTest(t)
+		ctx, tx := beginMigrationTest(t)
 		userID := insertIdentityTestUser(t, ctx, tx)
 
 		if _, err := tx.Exec(ctx, `
@@ -270,27 +267,27 @@ func TestIdentityMigrationEnforcesCredentialInvariants(t *testing.T) {
 			INSERT INTO credentials (user_id, email, password_hash)
 			VALUES ($1, $2, '$argon2id$second')
 		`, userID, "second-"+identityTestEmail(userID))
-		assertIdentitySQLState(t, err, "23505")
+		assertMigrationSQLState(t, err, "23505")
 	})
 
 	t.Run("credential requires existing user", func(t *testing.T) {
-		ctx, tx := beginIdentityTest(t)
-		missingUserID := newIdentityTestUUID(t)
+		ctx, tx := beginMigrationTest(t)
+		missingUserID := newMigrationTestUUID(t)
 		_, err := tx.Exec(ctx, `
 			INSERT INTO credentials (user_id, email, password_hash)
 			VALUES ($1, $2, '$argon2id$test-hash')
 		`, missingUserID, identityTestEmail(missingUserID))
-		assertIdentitySQLState(t, err, "23503")
+		assertMigrationSQLState(t, err, "23503")
 	})
 
 	t.Run("password hash must not be empty", func(t *testing.T) {
-		ctx, tx := beginIdentityTest(t)
+		ctx, tx := beginMigrationTest(t)
 		userID := insertIdentityTestUser(t, ctx, tx)
 		_, err := tx.Exec(ctx, `
 			INSERT INTO credentials (user_id, email, password_hash)
 			VALUES ($1, $2, '')
 		`, userID, identityTestEmail(userID))
-		assertIdentitySQLState(t, err, "23514")
+		assertMigrationSQLState(t, err, "23514")
 	})
 }
 
@@ -322,7 +319,7 @@ func TestIdentityMigrationEnforcesSessionChronology(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, tx := beginIdentityTest(t)
+			ctx, tx := beginMigrationTest(t)
 			userID := insertIdentityTestUser(t, ctx, tx)
 			createdAt := time.Now().UTC().Truncate(time.Microsecond)
 
@@ -337,14 +334,14 @@ func TestIdentityMigrationEnforcesSessionChronology(t *testing.T) {
 				)
 				VALUES ($1, $2, $3, $4, $5, $6)
 			`,
-				newIdentityTestUUID(t),
+				newMigrationTestUUID(t),
 				userID,
 				createdAt,
 				createdAt.Add(test.activityOffset),
 				createdAt.Add(test.expiresOffset),
 				revokedAt,
 			)
-			assertIdentitySQLState(t, err, "23514")
+			assertMigrationSQLState(t, err, "23514")
 		})
 	}
 }
@@ -352,19 +349,19 @@ func TestIdentityMigrationEnforcesSessionChronology(t *testing.T) {
 // TestIdentityMigrationEnforcesAddressInvariants kiểm tra field bắt buộc, country code và tối đa một default address cho mỗi User.
 func TestIdentityMigrationEnforcesAddressInvariants(t *testing.T) {
 	t.Run("recipient name must not be blank", func(t *testing.T) {
-		ctx, tx := beginIdentityTest(t)
+		ctx, tx := beginMigrationTest(t)
 		userID := insertIdentityTestUser(t, ctx, tx)
 		_, err := tx.Exec(ctx, `
 			INSERT INTO user_addresses (
 				id, user_id, recipient_name, recipient_phone, address_line1, province
 			)
 			VALUES ($1, $2, '   ', '0900000000', '1 Test Street', 'Ha Noi')
-		`, newIdentityTestUUID(t), userID)
-		assertIdentitySQLState(t, err, "23514")
+		`, newMigrationTestUUID(t), userID)
+		assertMigrationSQLState(t, err, "23514")
 	})
 
 	t.Run("country code must be two uppercase letters", func(t *testing.T) {
-		ctx, tx := beginIdentityTest(t)
+		ctx, tx := beginMigrationTest(t)
 		userID := insertIdentityTestUser(t, ctx, tx)
 		_, err := tx.Exec(ctx, `
 			INSERT INTO user_addresses (
@@ -372,12 +369,12 @@ func TestIdentityMigrationEnforcesAddressInvariants(t *testing.T) {
 				address_line1, province, country_code
 			)
 			VALUES ($1, $2, 'Test User', '0900000000', '1 Test Street', 'Ha Noi', 'vn')
-		`, newIdentityTestUUID(t), userID)
-		assertIdentitySQLState(t, err, "23514")
+		`, newMigrationTestUUID(t), userID)
+		assertMigrationSQLState(t, err, "23514")
 	})
 
 	t.Run("only one default address per user", func(t *testing.T) {
-		ctx, tx := beginIdentityTest(t)
+		ctx, tx := beginMigrationTest(t)
 		userID := insertIdentityTestUser(t, ctx, tx)
 
 		if _, err := tx.Exec(ctx, `
@@ -386,7 +383,7 @@ func TestIdentityMigrationEnforcesAddressInvariants(t *testing.T) {
 				address_line1, province, is_default
 			)
 			VALUES ($1, $2, 'First User', '0900000000', '1 Test Street', 'Ha Noi', true)
-		`, newIdentityTestUUID(t), userID); err != nil {
+		`, newMigrationTestUUID(t), userID); err != nil {
 			t.Fatalf("insert first default address: %v", err)
 		}
 
@@ -396,15 +393,15 @@ func TestIdentityMigrationEnforcesAddressInvariants(t *testing.T) {
 				address_line1, province, is_default
 			)
 			VALUES ($1, $2, 'Second User', '0900000001', '2 Test Street', 'Ha Noi', true)
-		`, newIdentityTestUUID(t), userID)
-		assertIdentitySQLState(t, err, "23505")
+		`, newMigrationTestUUID(t), userID)
+		assertMigrationSQLState(t, err, "23505")
 	})
 }
 
 // TestIdentityMigrationConcurrentDefaultAddresses xác nhận partial unique index chỉ cho một request đồng thời tạo default address thành công.
 func TestIdentityMigrationConcurrentDefaultAddresses(t *testing.T) {
-	ctx, pool := openIdentityTestPool(t)
-	userID := newIdentityTestUUID(t)
+	ctx, pool := openMigrationTestPool(t)
+	userID := newMigrationTestUUID(t)
 	if _, err := pool.Exec(ctx, `
 		INSERT INTO users (id, display_name)
 		VALUES ($1, 'Concurrent Address Test User')
@@ -419,7 +416,7 @@ func TestIdentityMigrationConcurrentDefaultAddresses(t *testing.T) {
 		_, _ = pool.Exec(cleanupContext, "DELETE FROM users WHERE id = $1", userID)
 	})
 
-	addressIDs := []string{newIdentityTestUUID(t), newIdentityTestUUID(t)}
+	addressIDs := []string{newMigrationTestUUID(t), newMigrationTestUUID(t)}
 	start := make(chan struct{})
 	results := make(chan error, len(addressIDs))
 	var waitGroup sync.WaitGroup
@@ -496,7 +493,7 @@ func TestIdentityMigrationRestrictsUserDeletion(t *testing.T) {
 				_, err := tx.Exec(ctx, `
 					INSERT INTO sessions (id, user_id, expires_at)
 					VALUES ($1, $2, now() + interval '1 hour')
-				`, newIdentityTestUUID(t), userID)
+				`, newMigrationTestUUID(t), userID)
 				if err != nil {
 					t.Fatalf("insert session: %v", err)
 				}
@@ -511,7 +508,7 @@ func TestIdentityMigrationRestrictsUserDeletion(t *testing.T) {
 						id, user_id, recipient_name, recipient_phone, address_line1, province
 					)
 					VALUES ($1, $2, 'Test User', '0900000000', '1 Test Street', 'Ha Noi')
-				`, newIdentityTestUUID(t), userID)
+				`, newMigrationTestUUID(t), userID)
 				if err != nil {
 					t.Fatalf("insert address: %v", err)
 				}
@@ -521,59 +518,21 @@ func TestIdentityMigrationRestrictsUserDeletion(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, tx := beginIdentityTest(t)
+			ctx, tx := beginMigrationTest(t)
 			userID := insertIdentityTestUser(t, ctx, tx)
 			test.insertChild(t, ctx, tx, userID)
 
 			_, err := tx.Exec(ctx, "DELETE FROM users WHERE id = $1", userID)
-			assertIdentitySQLState(t, err, "23503")
+			assertMigrationSQLState(t, err, "23503")
 		})
 	}
-}
-
-// beginIdentityTest mở pool và transaction riêng cho test, sau đó luôn rollback và đóng pool khi test kết thúc.
-func beginIdentityTest(t *testing.T) (context.Context, pgx.Tx) {
-	t.Helper()
-
-	ctx, pool := openIdentityTestPool(t)
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		t.Fatalf("begin identity test transaction: %v", err)
-	}
-
-	t.Cleanup(func() {
-		cleanupContext, cleanupCancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cleanupCancel()
-		_ = tx.Rollback(cleanupContext)
-	})
-
-	return ctx, tx
-}
-
-// openIdentityTestPool mở pgxpool tới TEST_DATABASE_URL và đăng ký đóng pool sau khi test kết thúc.
-func openIdentityTestPool(t *testing.T) (context.Context, *pgxpool.Pool) {
-	t.Helper()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	pool, err := NewPool(ctx, testDatabaseConfig(requireTestDatabaseURL(t)))
-	if err != nil {
-		cancel()
-		t.Fatalf("open identity test database: %v", err)
-	}
-
-	t.Cleanup(func() {
-		pool.Close()
-		cancel()
-	})
-
-	return ctx, pool
 }
 
 // insertIdentityTestUser tạo một active User hợp lệ và trả về ID để test các bảng con.
 func insertIdentityTestUser(t *testing.T, ctx context.Context, tx pgx.Tx) string {
 	t.Helper()
 
-	userID := newIdentityTestUUID(t)
+	userID := newMigrationTestUUID(t)
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO users (id, display_name)
 		VALUES ($1, 'Identity Test User')
@@ -584,29 +543,6 @@ func insertIdentityTestUser(t *testing.T, ctx context.Context, tx pgx.Tx) string
 	return userID
 }
 
-// newIdentityTestUUID tạo UUIDv7 với Unix timestamp millisecond để test đúng chiến lược ID mà không thêm dependency mới.
-func newIdentityTestUUID(t *testing.T) string {
-	t.Helper()
-
-	var value [16]byte
-	if _, err := rand.Read(value[:]); err != nil {
-		t.Fatalf("generate test UUID: %v", err)
-	}
-
-	timestamp := uint64(time.Now().UnixMilli())
-	value[0] = byte(timestamp >> 40)
-	value[1] = byte(timestamp >> 32)
-	value[2] = byte(timestamp >> 24)
-	value[3] = byte(timestamp >> 16)
-	value[4] = byte(timestamp >> 8)
-	value[5] = byte(timestamp)
-	value[6] = (value[6] & 0x0f) | 0x70
-	value[8] = (value[8] & 0x3f) | 0x80
-	encoded := hex.EncodeToString(value[:])
-
-	return encoded[0:8] + "-" + encoded[8:12] + "-" + encoded[12:16] + "-" + encoded[16:20] + "-" + encoded[20:32]
-}
-
 // identityTestEmail tạo email lowercase duy nhất từ UUID để các test không xung đột dữ liệu.
 func identityTestEmail(userID string) string {
 	return strings.ReplaceAll(userID, "-", "") + "@example.com"
@@ -615,21 +551,4 @@ func identityTestEmail(userID string) string {
 // identityDurationPointer trả con trỏ duration để biểu diễn timestamp tùy chọn trong bảng test case.
 func identityDurationPointer(value time.Duration) *time.Duration {
 	return &value
-}
-
-// assertIdentitySQLState xác nhận PostgreSQL từ chối dữ liệu bằng đúng nhóm lỗi constraint mong đợi.
-func assertIdentitySQLState(t *testing.T, err error, expectedCode string) {
-	t.Helper()
-
-	if err == nil {
-		t.Fatalf("database error = nil, want SQLSTATE %s", expectedCode)
-	}
-
-	var postgresError *pgconn.PgError
-	if !errors.As(err, &postgresError) {
-		t.Fatalf("database error type = %T, want *pgconn.PgError: %v", err, err)
-	}
-	if postgresError.Code != expectedCode {
-		t.Fatalf("database SQLSTATE = %s, want %s: %v", postgresError.Code, expectedCode, err)
-	}
 }

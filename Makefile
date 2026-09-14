@@ -1,4 +1,4 @@
-# File này gom các lệnh cài tool, vận hành PostgreSQL, chạy migration và kiểm tra DB-004A/DB-004B.
+# File này gom các lệnh cài tool, vận hành PostgreSQL, chạy migration và kiểm tra các ticket thuộc chuỗi DB-004.
 MIGRATE_VERSION ?= v4.18.3
 TOOLS_BIN ?= $(CURDIR)/bin
 MIGRATE ?= $(TOOLS_BIN)/migrate

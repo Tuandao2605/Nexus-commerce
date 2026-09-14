@@ -4,12 +4,12 @@ Use this reference for PostgreSQL schema work, sqlc queries, repository methods,
 
 ## Current Status
 
-DB-004A and DB-004B are implemented: the repository has a pgxpool adapter,
-golang-migrate tooling, and `000001_identity` for `users`, `credentials`,
-`sessions`, and `user_addresses`. The Identity migration plus executable
-PostgreSQL tests are now the implemented source of truth for those tables.
-Seller/Catalog and later domain schemas, SQL queries, and sqlc config remain
-planned until their own tickets implement them.
+DB-004A through DB-004C are implemented: the repository has a pgxpool adapter,
+golang-migrate tooling, `000001_identity`, `000002_seller`, and
+`000003_catalog`. Their migrations plus executable PostgreSQL tests are the
+implemented source of truth for Identity, Seller, and Catalog tables. Inventory
+and later domain schemas, SQL queries, and sqlc config remain planned until
+their own tickets implement them.
 
 DATA-003A → DATA-003F have been reconciled by the DATA-003G review. Treat
 `docs/erd.md` as the cross-domain review and each DATA document as the detailed
@@ -117,6 +117,9 @@ Never edit an already-applied shared migration to disguise a new change; add a n
 
 - `migrations/000001_identity.*.sql`: implemented Identity schema.
 - `internal/database/identity_migration_test.go`: executable Identity invariants.
+- `migrations/000002_seller.*.sql`: implemented Seller schema.
+- `migrations/000003_catalog.*.sql`: implemented Catalog schema.
+- `internal/database/seller_catalog_migration_test.go`: executable Seller/Catalog invariants.
 - `docs/data-003a-identity.md`: Auth/User ERD V1.
 - `docs/data-003b-seller-catalog.md`: Seller/Catalog ERD V1.
 - `docs/erd.md`: reconciled cross-domain ERD review.

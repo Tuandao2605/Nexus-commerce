@@ -1,6 +1,6 @@
 # ECOM-DATA-003B — Seller & Catalog Domain Model
 
-> Status: FINAL DESIGN — reconciled with DATA-003G remediation
+> Status: FINAL DESIGN — reconciled with DATA-003G and implemented by DB-004C
 
 ## 1. Scope
 
@@ -2728,6 +2728,7 @@ Historical business records are not destroyed.
 
 DATA-003B hoàn thành thiết kế Seller + Catalog ở mức ERD.
 
-Chưa viết migration.
+Migration đã được triển khai trong `000002_seller` và `000003_catalog`, kèm
+PostgreSQL integration tests ở DB-004C.
 
-Chưa implement Go repository/service.
+Chưa implement sqlc query hoặc Go repository/service.
