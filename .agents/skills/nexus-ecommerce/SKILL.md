@@ -5,7 +5,7 @@ description: Apply Nexus-Commerce-specific domain rules, module boundaries, pers
 
 # Nexus Ecommerce
 
-Build against the repository's implemented state while preserving its target architecture. The current code is an early Go/Chi bootstrap; PostgreSQL, sqlc, migrations, Redis, messaging, and most domain modules are planned but not yet implemented. Never describe a planned component as already present.
+Build against the repository's implemented state while preserving its target architecture. The current code is a Go/Chi service with pgxpool, golang-migrate, and implemented Identity through Cart schemas. sqlc, Redis, messaging, and later domain modules remain planned. Never describe a planned component as already present.
 
 The user's request takes precedence over this skill. For repository facts, prefer executable contracts in code, tests, and migrations over prose. When prose documents disagree or leave a contract open, call out the mismatch and resolve it in the task's design or ADR instead of silently choosing.
 
@@ -30,25 +30,4 @@ Read only the references needed for the current task. Consult the linked reposit
 - Critical writes and payment/event consumers are idempotent. Transactional state plus its outbox event commit atomically.
 - Authorization combines role/permission checks with resource and shop ownership checks.
 
-## Work Method
-
-1. Identify the owning module and the invariants affected before editing.
-2. Trace success, retry, duplicate, timeout, cancellation, and crash paths for any critical write.
-3. Put semantic validation in the application layer and correctness/concurrency invariants in PostgreSQL constraints or transactional SQL.
-4. Keep handlers thin: decode and validate, authenticate/authorize, call the application service, and encode the stable response/error contract.
-5. Propagate `context.Context` from HTTP through service and repository calls; do not replace request context with `context.Background()`.
-6. Implement the smallest coherent vertical slice and avoid speculative abstractions, interfaces for every struct, premature microservices, or incidental goroutines.
-7. Update the relevant contract, migration/schema notes, and tests when a business decision changes.
-
-## Verification
-
-Run `go test ./...` for every Go change. Add the narrowest relevant tests:
-
-- unit tests for validation, calculations, and state transitions;
-- repository/integration tests with PostgreSQL, preferably `testcontainers-go`, for constraints, transactions, locks, and sqlc queries;
-- HTTP tests for status, response/error envelope, authentication, authorization, and idempotency;
-- concurrency tests for stock and voucher invariants;
-- duplicate/retry/failure tests for payment webhooks, events, outbox workers, and compensation;
-- k6 or targeted load tests only when performance or capacity is in scope.
-
-Do not mark critical commerce work complete unless its business invariant is observable in tests, not merely covered by mocks.
+For ticket order, verification, command safety, and diff review, follow the repository `AGENTS.md` and the matching short workflow. Keep this skill focused on Nexus-specific decisions.
