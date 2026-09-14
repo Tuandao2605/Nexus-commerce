@@ -1,6 +1,6 @@
 # ECOM-DATA-003C — Inventory Domain Model
 
-> Status: FINAL DESIGN — reconciled with DATA-003G remediation
+> Status: FINAL DESIGN — reconciled with DATA-003G and implemented by DB-004D
 
 ## 1. Scope
 
@@ -3536,24 +3536,28 @@ Audit Ledger Strategy
 Acceptance Test Design
 ```
 
-Chưa thực hiện:
+Đã thực hiện trong DB-004D:
 
 ```text
 PostgreSQL migration
+PostgreSQL schema integration tests
+Raw SQL concurrency and transaction tests
+```
+
+Chưa thực hiện:
+
+```text
 sqlc queries
 Go repository
 Inventory service
 Expiration worker
-Concurrency integration tests
 Benchmark
 ```
 
-Bước tiếp theo sau khi DATA-003C được approve:
+Bước triển khai tiếp theo của Inventory sau khi toàn bộ schema DB-004 hoàn tất:
 
 ```text
-DATA-003C
-        ↓
-PostgreSQL migration
+ECOM-DB-005 SQLC Foundation
         ↓
 sqlc queries
         ↓
