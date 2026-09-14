@@ -1,7 +1,6 @@
 # ECOM-DATA-003E — Order Domain Model
 
-> Status: FINAL DESIGN — reconciled with DATA-003G remediation  
-> Scope: design only; migrations/sqlc/Go implementation chưa tồn tại.
+> Status: FINAL DESIGN — reconciled with DATA-003G and implemented by DB-004F
 
 ## 1. Scope
 
@@ -3242,9 +3241,20 @@ Order snapshots commercial amounts Payment operates against, nhưng Payment Doma
 
 ## 107. Out of Scope
 
-DATA-003E không implement:
+DATA-003E là design ticket. DB-004F đã triển khai PostgreSQL migration, schema
+integration tests và raw SQL transaction/concurrency tests từ thiết kế này.
 
+Đã thực hiện trong DB-004F:
+
+```text
 PostgreSQL migration
+PostgreSQL schema integration tests
+Raw SQL transaction and concurrency tests
+```
+
+Chưa thực hiện:
+
+```text
 sqlc
 Go models
 repositories
@@ -3259,8 +3269,9 @@ Seller settlement
 Promotion detail tables
 Tax detail tables
 Order adjustment tables
+```
 
-Các phần này nằm ở implementation/domain tickets sau.
+Các phần implementation còn lại sẽ được thực hiện ở SQLC và business tickets sau DB-004.
 
 ## 108. DATA-003E Completion State
 

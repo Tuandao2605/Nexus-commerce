@@ -4,12 +4,12 @@ Use this reference for PostgreSQL schema work, sqlc queries, repository methods,
 
 ## Current Status
 
-DB-004A through DB-004E are implemented: the repository has a pgxpool adapter,
-golang-migrate tooling, `000001_identity`, `000002_seller`, and
-`000003_catalog`, `000004_inventory`, and `000005_cart`. Their migrations plus
-executable PostgreSQL tests are the implemented source of truth for Identity,
-Seller, Catalog, Inventory, and Cart tables. Order and later domain schemas, SQL
-queries, and sqlc config remain planned until their own tickets implement them.
+DB-004A through DB-004F are implemented: the repository has a pgxpool adapter,
+golang-migrate tooling, `000001_identity`, `000002_seller`,
+`000003_catalog`, `000004_inventory`, `000005_cart`, and `000006_order`.
+Their migrations plus executable PostgreSQL tests are the implemented source of truth for
+Identity, Seller, Catalog, Inventory, Cart, and Order tables. Voucher and later domain schemas,
+SQL queries, and sqlc config remain planned until their own tickets implement them.
 
 DATA-003A → DATA-003F have been reconciled by the DATA-003G review. Treat
 `docs/erd.md` as the cross-domain review and each DATA document as the detailed
@@ -55,6 +55,20 @@ Cart:
 - One SKU appears once per Cart and quantity is `1..99`.
 - Cart stores no price, total, currency, stock, or reservation source of truth.
 - CartItem mutations and lifecycle transitions must lock/validate the active Cart in the future repository transaction.
+
+Order:
+
+- Option C: Parent Order aggregates Checkout (no `shop_id`, no direct `order_items`).
+- Seller Order owns operational fulfillment for one Shop (`parent_order_id`, `shop_id` required).
+- Seller Order buyer (`user_id`) and `currency` must match Parent Order via composite self-FK.
+- Seller Order `currency` must match `shops(id, currency_code)`.
+- At most one Seller Order per Parent Order and Shop (`uq_orders_parent_shop`).
+- At most one Parent Order per Checkout (`checkout_reference_id`).
+- Supporting key `UNIQUE(id, order_type)` enables downstream Parent-safe FKs for Voucher and Payment.
+- OrderItem belongs to exactly one Seller Order and Shop via `(order_id, shop_id)` and preserves the Catalog trace chain with composite Variant/Product/Shop and SKU/Variant/Shop FKs.
+- Order and OrderItem preserve immutable commercial and entity snapshots (names, SKU codes, prices, addresses).
+- Statuses start at `'awaiting_payment'` and partition strictly between Parent and Seller.
+- The future Order repository must update lifecycle status and append `order_status_histories` atomically in one transaction.
 
 For exact columns, lifecycle checks, and indexes, read
 `docs/data-003a-identity.md`, `docs/data-003b-seller-catalog.md`, and the relevant
@@ -109,7 +123,7 @@ An owner-module state change and its outbox event are inserted in the same trans
 
 ## Migration Rules
 
-The planned tool is `golang-migrate`, with direct SQL and sqlc rather than an ORM. Until the first migration establishes local naming and rollback policy, do not invent competing conventions.
+The repository uses `golang-migrate`, with direct SQL and planned sqlc rather than an ORM. Follow the established migration naming and rollback policy; do not invent competing conventions.
 
 For each migration:
 
@@ -133,9 +147,12 @@ Never edit an already-applied shared migration to disguise a new change; add a n
 - `internal/database/inventory_migration_test.go`: executable Inventory schema, transaction, and concurrency invariants.
 - `migrations/000005_cart.*.sql`: implemented Cart schema.
 - `internal/database/cart_migration_test.go`: executable Cart schema, lifecycle, transaction, and concurrency invariants.
+- `migrations/000006_order.*.sql`: implemented Order schema.
+- `internal/database/order_migration_test.go`: executable Order schema, hierarchy, snapshot, lifecycle, transaction, and concurrency invariants.
 - `docs/data-003a-identity.md`: Auth/User ERD V1.
 - `docs/data-003b-seller-catalog.md`: Seller/Catalog ERD V1.
 - `docs/data-003d-cart.md`: Cart ERD V1 and implemented DB-004E boundary.
+- `docs/data-003e-order.md`: Order ERD V1 and implemented DB-004F boundary.
 - `docs/erd.md`: reconciled cross-domain ERD review.
 - `notes/architect.md`: ownership and checkout compensation decisions.
 - `nexus_commerce_golang_requirements.txt`: PostgreSQL, pgx, sqlc, golang-migrate, concurrency, outbox, and testing targets.

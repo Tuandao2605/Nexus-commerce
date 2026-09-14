@@ -5,7 +5,7 @@ description: Apply Nexus-Commerce-specific domain rules, module boundaries, pers
 
 # Nexus Ecommerce
 
-Build against the repository's implemented state while preserving its target architecture. The current code is a Go/Chi service with pgxpool, golang-migrate, and implemented Identity through Cart schemas. sqlc, Redis, messaging, and later domain modules remain planned. Never describe a planned component as already present.
+Build against the repository's implemented state while preserving its target architecture. The current code is a Go/Chi service with pgxpool, golang-migrate, and implemented Identity through Order schemas. sqlc, Redis, messaging, and later domain modules remain planned. Never describe a planned component as already present.
 
 The user's request takes precedence over this skill. For repository facts, prefer executable contracts in code, tests, and migrations over prose. When prose documents disagree or leave a contract open, call out the mismatch and resolve it in the task's design or ADR instead of silently choosing.
 

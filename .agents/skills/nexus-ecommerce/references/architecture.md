@@ -6,8 +6,8 @@ Use this reference for module placement, cross-module calls, checkout orchestrat
 
 The repository currently contains a Go 1.23 service using Chi, JSON `slog`,
 graceful shutdown, `GET /health`, PostgreSQL through pgxpool, golang-migrate,
-and the implemented Identity, Seller, Catalog, Inventory, and Cart schemas. The
-remaining domain modules and infrastructure below are approved targets, not
+and the implemented Identity, Seller, Catalog, Inventory, Cart, and Order schemas.
+The remaining domain modules and infrastructure below are approved targets, not
 evidence of implemented code.
 
 Evolution path:

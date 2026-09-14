@@ -4,7 +4,7 @@
 
 **Status:** Active Development  
 **Current Stage:** V1 — Production-Grade Core Commerce  
-**Current Active Ticket:** `ECOM-DB-004F — Order Schema`
+**Current Active Ticket:** `ECOM-DB-004G — Voucher Schema`
 **Next Stage:** V2 — Business-Complete Event-Driven Modular Monolith  
 **Future Stage:** V3 — Selective Microservices & Event Streaming
 
@@ -500,6 +500,7 @@ ECOM-DB-004B Identity Schema               ✅ PASS (verified 2026-09-14)
 ECOM-DB-004C Seller + Catalog Schema       ✅ PASS (verified 2026-09-14)
 ECOM-DB-004D Inventory Schema              ✅ PASS (verified 2026-09-14)
 ECOM-DB-004E Cart Schema                   ✅ PASS (verified 2026-09-14)
+ECOM-DB-004F Order Schema                  ✅ PASS (verified 2026-09-15)
 ```
 
 Các correction của DATA-003G phải được encode vào migration; không tạo thêm một design phase mới.
@@ -516,8 +517,8 @@ ECOM-DB-004B Identity Schema               ✅ PASS
 ECOM-DB-004C Seller + Catalog Schema       ✅ PASS
 ECOM-DB-004D Inventory Schema              ✅ PASS
 ECOM-DB-004E Cart Schema                   ✅ PASS
-ECOM-DB-004F Order Schema                  ← CURRENT
-ECOM-DB-004G Voucher Schema
+ECOM-DB-004F Order Schema                  ✅ PASS
+ECOM-DB-004G Voucher Schema                ← CURRENT
 ECOM-DB-004H Payment Schema
 ECOM-DB-004I Cross-Domain Constraint Tests
 ECOM-DB-004J Full Migration Review
@@ -1072,9 +1073,9 @@ ECOM-DB-004D Inventory Schema              ✅ PASS
         ↓
 ECOM-DB-004E Cart Schema                   ✅ PASS
         ↓
-ECOM-DB-004F Order Schema                  ← CURRENT
-        ↓ PASS
-ECOM-DB-004G Voucher Schema
+ECOM-DB-004F Order Schema                  ✅ PASS
+        ↓
+ECOM-DB-004G Voucher Schema                ← CURRENT
         ↓ PASS
 ECOM-DB-004H Payment Schema
         ↓ PASS
