@@ -4,12 +4,12 @@ Use this reference for PostgreSQL schema work, sqlc queries, repository methods,
 
 ## Current Status
 
-DB-004A through DB-004C are implemented: the repository has a pgxpool adapter,
+DB-004A through DB-004E are implemented: the repository has a pgxpool adapter,
 golang-migrate tooling, `000001_identity`, `000002_seller`, and
-`000003_catalog`. Their migrations plus executable PostgreSQL tests are the
-implemented source of truth for Identity, Seller, and Catalog tables. Inventory
-and later domain schemas, SQL queries, and sqlc config remain planned until
-their own tickets implement them.
+`000003_catalog`, `000004_inventory`, and `000005_cart`. Their migrations plus
+executable PostgreSQL tests are the implemented source of truth for Identity,
+Seller, Catalog, Inventory, and Cart tables. Order and later domain schemas, SQL
+queries, and sqlc config remain planned until their own tickets implement them.
 
 DATA-003A → DATA-003F have been reconciled by the DATA-003G review. Treat
 `docs/erd.md` as the cross-domain review and each DATA document as the detailed
@@ -46,6 +46,15 @@ Seller/Catalog:
 - Product slug is unique per Shop. SKU code is unique per Shop.
 - SKU owns current price. Product and Variant do not.
 - SKU contains no stock quantity. Inventory owns stock by `sku_id`.
+
+Cart:
+
+- One User has at most one active global Cart; historical terminal Carts remain allowed.
+- Global Cart has no `shop_id`; each CartItem carries `shop_id` and `sku_id`.
+- Composite FK enforces `CartItem.shop_id = SKU.shop_id`.
+- One SKU appears once per Cart and quantity is `1..99`.
+- Cart stores no price, total, currency, stock, or reservation source of truth.
+- CartItem mutations and lifecycle transitions must lock/validate the active Cart in the future repository transaction.
 
 For exact columns, lifecycle checks, and indexes, read
 `docs/data-003a-identity.md`, `docs/data-003b-seller-catalog.md`, and the relevant
@@ -120,8 +129,13 @@ Never edit an already-applied shared migration to disguise a new change; add a n
 - `migrations/000002_seller.*.sql`: implemented Seller schema.
 - `migrations/000003_catalog.*.sql`: implemented Catalog schema.
 - `internal/database/seller_catalog_migration_test.go`: executable Seller/Catalog invariants.
+- `migrations/000004_inventory.*.sql`: implemented Inventory schema.
+- `internal/database/inventory_migration_test.go`: executable Inventory schema, transaction, and concurrency invariants.
+- `migrations/000005_cart.*.sql`: implemented Cart schema.
+- `internal/database/cart_migration_test.go`: executable Cart schema, lifecycle, transaction, and concurrency invariants.
 - `docs/data-003a-identity.md`: Auth/User ERD V1.
 - `docs/data-003b-seller-catalog.md`: Seller/Catalog ERD V1.
+- `docs/data-003d-cart.md`: Cart ERD V1 and implemented DB-004E boundary.
 - `docs/erd.md`: reconciled cross-domain ERD review.
 - `notes/architect.md`: ownership and checkout compensation decisions.
 - `nexus_commerce_golang_requirements.txt`: PostgreSQL, pgx, sqlc, golang-migrate, concurrency, outbox, and testing targets.

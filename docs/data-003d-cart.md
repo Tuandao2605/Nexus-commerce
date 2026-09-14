@@ -1,6 +1,6 @@
 # ECOM-DATA-003D — Cart Domain Model
 
-> Status: FINAL DESIGN — reconciled with DATA-003G remediation
+> Status: FINAL DESIGN — reconciled with DATA-003G and implemented by DB-004E
 
 ## 1. Scope
 
@@ -2450,12 +2450,12 @@ Cart != Order
 
 # 69. Out of Scope
 
-DATA-003D là design ticket.
+DATA-003D là design ticket. DB-004E đã triển khai PostgreSQL migration, schema
+integration tests và raw SQL transaction/concurrency tests từ thiết kế này.
 
 Chưa thực hiện:
 
 ```text
-PostgreSQL migration
 sqlc queries
 Go repository
 Cart service
@@ -2466,7 +2466,7 @@ Order integration
 cleanup worker
 ```
 
-Các phần implementation sẽ được thực hiện sau khi DATA-003D được review và approve.
+Các phần implementation còn lại sẽ được thực hiện ở SQLC và business tickets sau DB-004.
 
 ---
 
@@ -2486,6 +2486,27 @@ Concurrency strategy
 Duplicate handling
 Checkout boundary
 Acceptance test design
+```
+
+Đã thực hiện trong DB-004E:
+
+```text
+PostgreSQL migration
+PostgreSQL schema integration tests
+Raw SQL transaction and concurrency tests
+```
+
+Chưa thực hiện:
+
+```text
+sqlc queries
+Go repository
+Cart service
+HTTP handlers
+Checkout implementation
+Inventory integration
+Order integration
+cleanup worker
 ```
 
 Decision quan trọng nhất:
