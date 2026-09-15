@@ -4,7 +4,7 @@
 
 **Status:** Active Development  
 **Current Stage:** V1 — Production-Grade Core Commerce  
-**Current Active Ticket:** `ECOM-DB-004I — Cross-Domain Constraint Tests`
+**Current Active Ticket:** `ECOM-AUTH-001 — Registration`
 **Next Stage:** V2 — Business-Complete Event-Driven Modular Monolith  
 **Future Stage:** V3 — Selective Microservices & Event Streaming
 
@@ -503,13 +503,16 @@ ECOM-DB-004E Cart Schema                   ✅ PASS (verified 2026-09-14)
 ECOM-DB-004F Order Schema                  ✅ PASS (verified 2026-09-15)
 ECOM-DB-004G Voucher Schema                ✅ PASS (verified 2026-09-15)
 ECOM-DB-004H Payment Schema                ✅ PASS (verified 2026-09-15)
+ECOM-DB-004I Cross-Domain Constraint Tests ✅ PASS (verified 2026-09-15)
+ECOM-DB-004J Full Migration Review         ✅ PASS (verified 2026-09-16)
+ECOM-DB-005 SQLC Foundation                ✅ PASS (verified 2026-09-16)
 ```
 
 Các correction của DATA-003G phải được encode vào migration; không tạo thêm một design phase mới.
 
 ---
 
-# 11. CURRENT PHASE — ECOM-DB-004
+# 11. COMPLETED PHASE — ECOM-DB-004
 
 ## PostgreSQL Schema & Migrations
 
@@ -522,8 +525,8 @@ ECOM-DB-004E Cart Schema                   ✅ PASS
 ECOM-DB-004F Order Schema                  ✅ PASS
 ECOM-DB-004G Voucher Schema                ✅ PASS
 ECOM-DB-004H Payment Schema                ✅ PASS
-ECOM-DB-004I Cross-Domain Constraint Tests ← CURRENT
-ECOM-DB-004J Full Migration Review
+ECOM-DB-004I Cross-Domain Constraint Tests ✅ PASS
+ECOM-DB-004J Full Migration Review         ✅ PASS
 ```
 
 Trong DB-004:
@@ -645,10 +648,10 @@ deadline decides validity
 
 ---
 
-# 14. AFTER DB-004 — SQLC FOUNDATION
+# 14. COMPLETED — SQLC FOUNDATION
 
 ```text
-ECOM-DB-005 — SQLC Foundation
+ECOM-DB-005 — SQLC Foundation ✅ PASS (verified 2026-09-16)
 ```
 
 Scope:
@@ -1081,11 +1084,13 @@ ECOM-DB-004G Voucher Schema                ✅ PASS
         ↓
 ECOM-DB-004H Payment Schema                ✅ PASS
         ↓
-ECOM-DB-004I Cross-Domain Constraint Tests ← CURRENT
-        ↓ PASS
-ECOM-DB-004J Full Migration Review
+ECOM-DB-004I Cross-Domain Constraint Tests ✅ PASS
         ↓
-ECOM-DB-005 SQLC Foundation
+ECOM-DB-004J Full Migration Review         ✅ PASS
+        ↓
+ECOM-DB-005 SQLC Foundation                ✅ PASS
+        ↓
+ECOM-AUTH-001 Registration                 ← CURRENT
 ```
 
 Sau đó mới bước vào business implementation.

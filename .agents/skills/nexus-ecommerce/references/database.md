@@ -4,12 +4,12 @@ Use this reference for PostgreSQL schema work, sqlc queries, repository methods,
 
 ## Current Status
 
-DB-004A through DB-004F are implemented: the repository has a pgxpool adapter,
-golang-migrate tooling, `000001_identity`, `000002_seller`,
-`000003_catalog`, `000004_inventory`, `000005_cart`, and `000006_order`.
-Their migrations plus executable PostgreSQL tests are the implemented source of truth for
-Identity, Seller, Catalog, Inventory, Cart, and Order tables. Voucher and later domain schemas,
-SQL queries, and sqlc config remain planned until their own tickets implement them.
+DB-004A through DB-004J and DB-005 are implemented: the repository has a pgxpool adapter,
+golang-migrate tooling, `000001_identity` through `000008_payment`, domain integration tests,
+cross-domain/full-migration gates, and a sqlc v1.31.1 foundation generated for pgx/v5. These
+migrations and executable PostgreSQL tests are the implemented source of truth for Identity,
+Seller, Catalog, Inventory, Cart, Order, Voucher, and Payment tables. Only the technical
+`DatabasePing` query exists; business queries remain scoped to their owning application tickets.
 
 DATA-003A → DATA-003F have been reconciled by the DATA-003G review. Treat
 `docs/erd.md` as the cross-domain review and each DATA document as the detailed
@@ -123,7 +123,7 @@ An owner-module state change and its outbox event are inserted in the same trans
 
 ## Migration Rules
 
-The repository uses `golang-migrate`, with direct SQL and planned sqlc rather than an ORM. Follow the established migration naming and rollback policy; do not invent competing conventions.
+The repository uses `golang-migrate`, with direct SQL and sqlc rather than an ORM for its primary persistence path. Follow the established migration naming and rollback policy; do not invent competing conventions.
 
 For each migration:
 
@@ -149,6 +149,16 @@ Never edit an already-applied shared migration to disguise a new change; add a n
 - `internal/database/cart_migration_test.go`: executable Cart schema, lifecycle, transaction, and concurrency invariants.
 - `migrations/000006_order.*.sql`: implemented Order schema.
 - `internal/database/order_migration_test.go`: executable Order schema, hierarchy, snapshot, lifecycle, transaction, and concurrency invariants.
+- `migrations/000007_voucher.*.sql`: implemented Voucher schema.
+- `internal/database/voucher_migration_test.go`: executable Voucher schema, expiry, idempotency, and concurrency invariants.
+- `migrations/000008_payment.*.sql`: implemented Payment schema.
+- `internal/database/payment_migration_test.go`: executable Payment, webhook, refund, idempotency, and concurrency invariants.
+- `internal/database/cross_domain_migration_test.go`: executable tenant, checkout, Parent safety, deadline, and cross-domain idempotency invariants.
+- `internal/database/full_migration_review_test.go`: migration manifest and final-schema regression gate.
+- `sqlc.yaml`: sqlc v2 configuration for the migration schema, pgx/v5, and generated database package.
+- `sql/queries/database.sql`: technical codegen/connection smoke query; not a business repository query.
+- `internal/database/sqlc/`: generated models, `DBTX`, `Queries`, and `WithTx` transaction wiring.
+- `internal/database/sqlc_integration_test.go`: executable pool, transaction, and context propagation checks for generated code.
 - `docs/data-003a-identity.md`: Auth/User ERD V1.
 - `docs/data-003b-seller-catalog.md`: Seller/Catalog ERD V1.
 - `docs/data-003d-cart.md`: Cart ERD V1 and implemented DB-004E boundary.

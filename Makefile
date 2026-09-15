@@ -1,7 +1,9 @@
 # File này gom các lệnh cài tool, vận hành PostgreSQL, chạy migration và kiểm tra các ticket thuộc chuỗi DB-004.
 MIGRATE_VERSION ?= v4.18.3
+SQLC_VERSION ?= v1.31.1
 TOOLS_BIN ?= $(CURDIR)/bin
 MIGRATE ?= $(TOOLS_BIN)/migrate
+SQLC ?= $(TOOLS_BIN)/sqlc
 MIGRATIONS_PATH ?= migrations
 TEST_MIGRATIONS_PATH ?= testdata/migrations
 COMMAND_TIMEOUT ?= 120s
@@ -20,6 +22,7 @@ export GOCACHE
 	agent-preflight \
 	tools \
 	check-migrate \
+	check-sqlc \
 	require-database \
 	require-test-database \
 	require-migration-probe-database \
@@ -39,6 +42,10 @@ export GOCACHE
 	migrate-integration-up \
 	migrate-integration-down \
 	migrate-integration-cycle \
+	migrate-integration-full-cycle \
+	sqlc-version \
+	sqlc-generate \
+	sqlc-check \
 	fmt \
 	format-check \
 	vet \
@@ -62,14 +69,22 @@ agent-preflight:
 		test "$$repo_root" = "$(CURDIR)" || { echo "FAIL: run make from repository root"; exit 1; }
 	@echo "PASS: agent preflight"
 
-# tools cài đúng phiên bản golang-migrate vào thư mục bin cục bộ của dự án.
+# tools cài đúng phiên bản golang-migrate và sqlc vào thư mục bin cục bộ của dự án.
 tools:
 	mkdir -p "$(TOOLS_BIN)"
 	GOBIN="$(TOOLS_BIN)" go install -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
+	GOBIN="$(TOOLS_BIN)" go install github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION)
 
 # check-migrate dừng sớm với hướng dẫn rõ ràng nếu binary migrate chưa được cài.
 check-migrate:
 	@test -x "$(MIGRATE)" || (echo "missing $(MIGRATE); run 'make tools'" && exit 1)
+
+# check-sqlc xác nhận binary sqlc local tồn tại và đúng version đã pin cho codegen tái lập.
+check-sqlc:
+	@test -x "$(SQLC)" || (echo "missing $(SQLC); run 'make tools'" && exit 1)
+	@actual_version="$$($(SQLC) version 2>&1)"; \
+		case "$$actual_version" in *"$(SQLC_VERSION)"*) ;; \
+		*) echo "FAIL: sqlc version $$actual_version, want $(SQLC_VERSION)"; exit 1;; esac
 
 # require-database ngăn domain migration local chạy khi thiếu DATABASE_URL.
 require-database:
@@ -160,6 +175,27 @@ migrate-integration-cycle: check-migrate require-test-database
 	@timeout "$(DB_COMMAND_TIMEOUT)" "$(MIGRATE)" -path "$(MIGRATIONS_PATH)" -database "$(TEST_DATABASE_URL)" down 1
 	@timeout "$(DB_COMMAND_TIMEOUT)" "$(MIGRATE)" -path "$(MIGRATIONS_PATH)" -database "$(TEST_DATABASE_URL)" up
 
+# migrate-integration-full-cycle bootstrap schema mới nhất, rollback toàn bộ rồi apply lại toàn chuỗi trên database test cô lập.
+migrate-integration-full-cycle: check-migrate require-test-database
+	@timeout "$(DB_COMMAND_TIMEOUT)" "$(MIGRATE)" -path "$(MIGRATIONS_PATH)" -database "$(TEST_DATABASE_URL)" up
+	@timeout "$(DB_COMMAND_TIMEOUT)" "$(MIGRATE)" -path "$(MIGRATIONS_PATH)" -database "$(TEST_DATABASE_URL)" down -all
+	@timeout "$(DB_COMMAND_TIMEOUT)" "$(MIGRATE)" -path "$(MIGRATIONS_PATH)" -database "$(TEST_DATABASE_URL)" up
+
+# sqlc-version in version binary sqlc đang được project sử dụng.
+sqlc-version: check-sqlc
+	@$(SQLC) version
+
+# sqlc-generate sinh package Go type-safe từ migration schema và các query đã khai báo.
+sqlc-generate: check-sqlc
+	@$(QUIET_RUN) "sqlc generate" timeout "$(COMMAND_TIMEOUT)" "$(SQLC)" generate
+
+# sqlc-check compile/vet SQL và fail nếu generated code không khớp schema/query hiện tại.
+sqlc-check: check-sqlc
+	@$(QUIET_RUN) "sqlc compile" timeout "$(COMMAND_TIMEOUT)" "$(SQLC)" compile
+	@$(QUIET_RUN) "sqlc vet" timeout "$(COMMAND_TIMEOUT)" "$(SQLC)" vet
+	@$(QUIET_RUN) "sqlc diff" timeout "$(COMMAND_TIMEOUT)" "$(SQLC)" diff
+	@echo "PASS: sqlc-check"
+
 # fmt định dạng toàn bộ package Go trong module.
 fmt:
 	@go fmt ./...
@@ -203,13 +239,13 @@ diff-check:
 	@git diff --stat
 
 # verify-fast là gate read-only, nhanh cho vòng lặp thường xuyên.
-verify-fast: agent-preflight format-check vet test
+verify-fast: agent-preflight sqlc-check format-check vet test
 	@echo "PASS: verify-fast"
 
-# verify-full chạy tuần tự gate nhanh, migration rollback/apply, PostgreSQL tests, status và diff gate.
+# verify-full chạy tuần tự gate nhanh, full migration rollback/apply, PostgreSQL tests, status và diff gate.
 verify-full:
 	@$(MAKE) --no-print-directory verify-fast
-	@$(MAKE) --no-print-directory migrate-integration-cycle
+	@$(MAKE) --no-print-directory migrate-integration-full-cycle
 	@$(MAKE) --no-print-directory test-integration
 	@$(MAKE) --no-print-directory db-migration-status
 	@$(MAKE) --no-print-directory diff-check

@@ -1,0 +1,18 @@
+# File này cấu hình sqlc đọc toàn bộ golang-migrate schema và sinh package Go dùng pgx/v5 cho persistence layer.
+version: "2"
+
+sql:
+  - name: "nexus-commerce"
+    engine: "postgresql"
+    schema: "migrations"
+    queries: "sql/queries"
+    gen:
+      go:
+        package: "dbsqlc"
+        out: "internal/database/sqlc"
+        sql_package: "pgx/v5"
+        emit_empty_slices: true
+        emit_json_tags: false
+        emit_interface: false
+        emit_prepared_queries: false
+        emit_sql_as_comment: true
