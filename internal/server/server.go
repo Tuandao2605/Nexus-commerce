@@ -23,13 +23,14 @@ type Server struct {
 	router chi.Router
 }
 
-func New(cfg config.Config, logger *slog.Logger) *Server {
+// New tạo HTTP server với logger và route dependencies đã được composition root wiring.
+func New(cfg config.Config, logger *slog.Logger, routeDependencies RouteDependencies) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
 
 	router := chi.NewRouter()
-	RegisterRoutes(router)
+	RegisterRoutes(router, routeDependencies)
 
 	return &Server{
 		cfg:    cfg,
@@ -38,6 +39,7 @@ func New(cfg config.Config, logger *slog.Logger) *Server {
 	}
 }
 
+// Run lắng nghe HTTP, chờ termination signal và drain request trong shutdown timeout.
 func (s *Server) Run() error {
 	httpServer := &http.Server{
 		Addr:    ":" + s.cfg.Port,

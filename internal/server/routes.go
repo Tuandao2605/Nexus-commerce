@@ -1,3 +1,4 @@
+// File này đăng ký health route và các business HTTP handlers được application bootstrap inject vào server.
 package server
 
 import (
@@ -7,7 +8,13 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func RegisterRoutes(router chi.Router) {
+// RouteDependencies chứa các HTTP handler đã được wiring đầy đủ, không chứa business logic trong server package.
+type RouteDependencies struct {
+	Registration http.Handler
+}
+
+// RegisterRoutes gắn process health và registration resource vào Chi router.
+func RegisterRoutes(router chi.Router, dependencies RouteDependencies) {
 	router.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -16,4 +23,8 @@ func RegisterRoutes(router chi.Router) {
 			"status": "ok",
 		})
 	})
+
+	if dependencies.Registration != nil {
+		router.Method(http.MethodPost, "/auth/registrations", dependencies.Registration)
+	}
 }

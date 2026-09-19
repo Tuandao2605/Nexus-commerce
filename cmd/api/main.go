@@ -7,9 +7,11 @@ import (
 	"log/slog"
 	"os"
 
+	"nexus-commerce/internal/auth"
 	"nexus-commerce/internal/config"
 	"nexus-commerce/internal/database"
 	"nexus-commerce/internal/server"
+	usermodule "nexus-commerce/internal/user"
 )
 
 // main tạo logger, chạy ứng dụng và kết thúc process với mã lỗi khi bootstrap hoặc server thất bại.
@@ -42,7 +44,20 @@ func run(logger *slog.Logger) error {
 
 	logger.Info("PostgreSQL connection pool initialized")
 
-	srv := server.New(cfg, logger)
+	passwordHasher, err := auth.NewArgon2idHasher(auth.DefaultArgon2idParams())
+	if err != nil {
+		return fmt.Errorf("initialize password hasher: %w", err)
+	}
+	registrationRepository := auth.NewPostgresRegistrationRepository(
+		pool,
+		usermodule.NewPostgresRegistrationWriter(),
+	)
+	registrationService := auth.NewRegistrationService(registrationRepository, passwordHasher)
+	registrationHandler := auth.NewRegistrationHandler(registrationService, logger)
+
+	srv := server.New(cfg, logger, server.RouteDependencies{
+		Registration: registrationHandler,
+	})
 	if err := srv.Run(); err != nil {
 		return fmt.Errorf("run HTTP server: %w", err)
 	}

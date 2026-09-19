@@ -1,3 +1,4 @@
+// File này kiểm thử health contract và wiring business handler của Chi router.
 package server
 
 import (
@@ -10,9 +11,10 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// TestHealth xác nhận health route giữ nguyên 200 JSON contract khi business dependencies chưa được inject.
 func TestHealth(t *testing.T) {
 	router := chi.NewRouter()
-	RegisterRoutes(router)
+	RegisterRoutes(router, RouteDependencies{})
 
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)
 	response := httptest.NewRecorder()
@@ -31,5 +33,27 @@ func TestHealth(t *testing.T) {
 	expectedBody := map[string]string{"status": "ok"}
 	if !reflect.DeepEqual(body, expectedBody) {
 		t.Errorf("expected body %v, got %v", expectedBody, body)
+	}
+}
+
+// TestRegistrationRouteDelegatesToInjectedHandler xác nhận POST resource được chuyển đúng sang Auth handler.
+func TestRegistrationRouteDelegatesToInjectedHandler(t *testing.T) {
+	called := false
+	registrationHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusCreated)
+	})
+	router := chi.NewRouter()
+	RegisterRoutes(router, RouteDependencies{Registration: registrationHandler})
+
+	request := httptest.NewRequest(http.MethodPost, "/auth/registrations", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	if !called {
+		t.Fatal("registration handler was not called")
+	}
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusCreated)
 	}
 }
