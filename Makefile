@@ -53,6 +53,7 @@ export GOCACHE
 	test-target \
 	test-integration \
 	test-integration-target \
+	test-auth-integration \
 	diff-check \
 	verify-fast \
 	verify-full \
@@ -223,7 +224,7 @@ test-target:
 test-integration: migrate-integration-up
 	@REQUIRE_DATABASE_INTEGRATION=1 TEST_DATABASE_URL="$(TEST_DATABASE_URL)" \
 		$(QUIET_RUN) "PostgreSQL integration tests" timeout "$(COMMAND_TIMEOUT)" \
-		go test -timeout "$(GO_TEST_TIMEOUT)" ./internal/database -count=1
+		go test -timeout "$(GO_TEST_TIMEOUT)" ./internal/database ./internal/auth -count=1
 
 # test-integration-target chạy focused PostgreSQL test nhưng vẫn cấm integration test bị skip âm thầm.
 test-integration-target: migrate-integration-up
@@ -231,6 +232,13 @@ test-integration-target: migrate-integration-up
 		$(QUIET_RUN) "targeted PostgreSQL integration test" timeout "$(COMMAND_TIMEOUT)" \
 		go test -timeout "$(GO_TEST_TIMEOUT)" ./internal/database -count=1 \
 		$(if $(DB_TEST_NAME),-run "$(DB_TEST_NAME)",)
+
+# test-auth-integration chạy riêng Auth registration/login tests với PostgreSQL thật và không cho phép skip âm thầm.
+test-auth-integration: migrate-integration-up
+	@REQUIRE_DATABASE_INTEGRATION=1 TEST_DATABASE_URL="$(TEST_DATABASE_URL)" \
+		$(QUIET_RUN) "Auth PostgreSQL integration tests" timeout "$(COMMAND_TIMEOUT)" \
+		go test -timeout "$(GO_TEST_TIMEOUT)" ./internal/auth -count=1 \
+		-run '^(TestPostgresRegistrationRepository|TestRegistrationHTTPIntegration|TestPostgresLogin)'
 
 # diff-check kiểm tra whitespace rồi in scope ngắn, gồm cả untracked files, để agent review trước completion.
 diff-check:

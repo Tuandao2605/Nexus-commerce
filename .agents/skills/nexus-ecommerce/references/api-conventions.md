@@ -4,13 +4,21 @@ Use this reference for HTTP handlers, JSON contracts, validation, idempotency, p
 
 ## Implemented and Provisional Contracts
 
-The only implemented route is:
+Implemented routes are:
 
 ```http
 GET /health
 200 Content-Type: application/json
 {"status":"ok"}
+
+POST /auth/registrations
+201 Content-Type: application/json
+{"id":"<uuidv7>","display_name":"...","email":"..."}
 ```
+
+The registration request is bounded to 16 KiB, requires `application/json`,
+rejects unknown fields, and uses the error envelope below. Its exact contract is
+documented in `docs/api.md`.
 
 The repository has not finalized a global API prefix, success envelope, pagination response, or error envelope. Preserve an existing contract when one is present. When adding the first shared contract, update this reference/API documentation and cover it with handler tests instead of creating endpoint-specific formats.
 
@@ -40,6 +48,8 @@ Rules:
 Use the most specific stable mapping:
 
 - `400 Bad Request`: malformed JSON, invalid fields, or unsupported query parameters.
+- `413 Content Too Large`: a bounded request body exceeds the endpoint limit.
+- `415 Unsupported Media Type`: a JSON endpoint receives a different content type.
 - `401 Unauthorized`: missing, invalid, expired, or revoked authentication.
 - `403 Forbidden`: authenticated actor lacks permission or resource/shop ownership.
 - `404 Not Found`: resource is absent or intentionally hidden by an established anti-enumeration policy.

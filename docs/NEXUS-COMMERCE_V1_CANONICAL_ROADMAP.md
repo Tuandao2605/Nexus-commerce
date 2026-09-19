@@ -4,7 +4,7 @@
 
 **Status:** Active Development  
 **Current Stage:** V1 — Production-Grade Core Commerce  
-**Current Active Ticket:** `ECOM-AUTH-001 — Registration`
+**Current Active Ticket:** `ECOM-AUTH-004 — Access Token`
 **Next Stage:** V2 — Business-Complete Event-Driven Modular Monolith  
 **Future Stage:** V3 — Selective Microservices & Event Streaming
 
@@ -676,10 +676,10 @@ Business query được thêm cùng ticket module cần nó.
 ## A. Auth + User
 
 ```text
-ECOM-AUTH-001 Registration
-ECOM-AUTH-002 Password Hashing
-ECOM-AUTH-003 Login
-ECOM-AUTH-004 Access Token
+ECOM-AUTH-001 Registration                      ✅ PASS (verified 2026-09-19)
+ECOM-AUTH-002 Password Hashing                  ✅ PASS (verified 2026-09-19)
+ECOM-AUTH-003 Login                             ✅ PASS (verified 2026-09-19)
+ECOM-AUTH-004 Access Token                      ← CURRENT
 ECOM-AUTH-005 Refresh Token Schema/Queries
 ECOM-AUTH-006 Refresh Rotation
 ECOM-AUTH-007 Logout / Revocation
@@ -1090,7 +1090,13 @@ ECOM-DB-004J Full Migration Review         ✅ PASS
         ↓
 ECOM-DB-005 SQLC Foundation                ✅ PASS
         ↓
-ECOM-AUTH-001 Registration                 ← CURRENT
+ECOM-AUTH-001 Registration                 ✅ PASS
+        ↓
+ECOM-AUTH-002 Password Hashing             ✅ PASS
+        ↓
+ECOM-AUTH-003 Login                        ✅ PASS
+        ↓
+ECOM-AUTH-004 Access Token                 ← CURRENT
 ```
 
 Sau đó mới bước vào business implementation.

@@ -1,18 +1,18 @@
 # File này cấu hình sqlc đọc toàn bộ golang-migrate schema và sinh package Go dùng pgx/v5 cho persistence layer.
-version: "2"
+version: "2" # Sử dụng chuẩn cấu hình version 2 của sqlc
 
 sql:
   - name: "nexus-commerce"
-    engine: "postgresql"
-    schema: "migrations"
-    queries: "sql/queries"
+    engine: "postgresql"        # Khai báo sử dụng PostgreSQL để parse đúng cú pháp SQL
+    schema: "migrations"        # Đọc các file UP.sql ở thư mục này để hiểu cấu trúc các bảng (tables/columns)
+    queries: "sql/queries"      # Đọc các câu lệnh SELECT/INSERT/UPDATE từ thư mục này
     gen:
-      go:
-        package: "dbsqlc"
-        out: "internal/database/sqlc"
-        sql_package: "pgx/v5"
-        emit_empty_slices: true
-        emit_json_tags: false
-        emit_interface: false
-        emit_prepared_queries: false
-        emit_sql_as_comment: true
+      go:                       # Yêu cầu sinh ra code ngôn ngữ Golang
+        package: "dbsqlc"       # Tên package của Go khi sinh ra sẽ là 'package dbsqlc'
+        out: "internal/database/sqlc" # Toàn bộ code sinh ra (models.go, db.go...) sẽ đặt ở thư mục này
+        sql_package: "pgx/v5"   # Ép sinh code tương thích driver pgx/v5 (nhanh và xịn hơn database/sql mặc định)
+        emit_empty_slices: true # Trả về mảng rỗng [] thay vì null nếu query không có data (chống lỗi panic Nil Pointer)
+        emit_json_tags: false   # Không tự động sinh thẻ `json:"..."` để ép dev tự viết DTO mapping, tuân thủ Clean Architecture
+        emit_interface: false   # Không tự sinh Interface tự động (ta sẽ định nghĩa Interface thủ công ở tầng Service)
+        emit_prepared_queries: false # Tắt Prepare (vì driver pgxpool đã tự động thực hiện Prepare ngầm rất tối ưu rồi)
+        emit_sql_as_comment: true # Chèn nguyên câu lệnh SQL vào làm comment phía trên hàm Go để dễ debug và review code

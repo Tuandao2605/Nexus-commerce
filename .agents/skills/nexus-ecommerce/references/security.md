@@ -38,6 +38,13 @@ Avoid trusting `user_id`, `seller_id`, or `shop_id` supplied by a client as proo
 
 Exact token algorithm, lifetime, and cookie/header transport are not finalized in the current repository. Make them explicit configuration/security decisions when implemented.
 
+The implemented AUTH-003 core canonicalizes email, uses a current-policy dummy
+Argon2id hash for unknown-account work, returns one generic credential error for
+unknown email/wrong password/inactive account, checks User status through a
+User-owned interface, and rehashes a verified legacy hash with compare-and-swap.
+It does not yet expose a public login route or issue tokens; those belong to the
+access-token ticket.
+
 ## Input and Output Safety
 
 - Use typed decoding and validation; reject unknown or dangerous fields according to the shared API policy.
