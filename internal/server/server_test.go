@@ -57,3 +57,25 @@ func TestRegistrationRouteDelegatesToInjectedHandler(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusCreated)
 	}
 }
+
+// TestLoginRouteDelegatesToInjectedHandler xác nhận POST /auth/login được chuyển đúng sang Auth handler.
+func TestLoginRouteDelegatesToInjectedHandler(t *testing.T) {
+	called := false
+	loginHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = r.Method == http.MethodPost
+		w.WriteHeader(http.StatusOK)
+	})
+	router := chi.NewRouter()
+	RegisterRoutes(router, RouteDependencies{Login: loginHandler})
+
+	request := httptest.NewRequest(http.MethodPost, "/auth/login", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	if !called {
+		t.Fatal("login handler was not called")
+	}
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+}

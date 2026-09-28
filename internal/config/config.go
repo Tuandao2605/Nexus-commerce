@@ -11,9 +11,27 @@ import (
 
 const defaultPort = "8080"
 
+const (
+	defaultAccessTokenIssuer   = "nexus-commerce"
+	defaultAccessTokenAudience = "nexus-commerce-api"
+	defaultAccessTokenClientID = "nexus-commerce"
+	defaultAccessTokenKeyID    = "local-rsa-1"
+	defaultAccessTokenTTL      = "15m"
+)
+
 type Config struct {
 	Port     string
 	Database DatabaseConfig
+	Auth     AuthConfig
+}
+
+type AuthConfig struct {
+	AccessTokenPrivateKeyFile string
+	AccessTokenIssuer         string
+	AccessTokenAudience       string
+	AccessTokenClientID       string
+	AccessTokenKeyID          string
+	AccessTokenTTL            time.Duration
 }
 
 type DatabaseConfig struct {
@@ -27,7 +45,7 @@ type DatabaseConfig struct {
 }
 
 // Load đọc cấu hình HTTP và PostgreSQL từ biến môi trường.
-// Hàm dùng cổng mặc định 8080 khi PORT trống và trả lỗi nếu cấu hình database không hợp lệ.
+// Hàm dùng cổng mặc định 8080 khi PORT trống và yêu cầu cấu hình database cùng access-token signing key.
 func Load() (Config, error) {
 	port := strings.TrimSpace(os.Getenv("PORT"))
 	if port == "" {
@@ -38,10 +56,38 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("load database config: %w", err)
 	}
+	authConfig, err := loadAuthConfig()
+	if err != nil {
+		return Config{}, fmt.Errorf("load auth config: %w", err)
+	}
 
 	return Config{
 		Port:     port,
 		Database: databaseConfig,
+		Auth:     authConfig,
+	}, nil
+}
+
+// loadAuthConfig reads access-token signing and claim settings with safe defaults for public claim values.
+func loadAuthConfig() (AuthConfig, error) {
+	privateKeyFile, err := requireEnv("AUTH_ACCESS_TOKEN_PRIVATE_KEY_FILE")
+	if err != nil {
+		return AuthConfig{}, err
+	}
+	lifetime, err := optionalPositiveDurationEnv("AUTH_ACCESS_TOKEN_TTL", defaultAccessTokenTTL)
+	if err != nil {
+		return AuthConfig{}, err
+	}
+	if lifetime < time.Minute || lifetime > 15*time.Minute {
+		return AuthConfig{}, fmt.Errorf("AUTH_ACCESS_TOKEN_TTL must be between 1m and 15m")
+	}
+	return AuthConfig{
+		AccessTokenPrivateKeyFile: privateKeyFile,
+		AccessTokenIssuer:         optionalEnv("AUTH_ACCESS_TOKEN_ISSUER", defaultAccessTokenIssuer),
+		AccessTokenAudience:       optionalEnv("AUTH_ACCESS_TOKEN_AUDIENCE", defaultAccessTokenAudience),
+		AccessTokenClientID:       optionalEnv("AUTH_ACCESS_TOKEN_CLIENT_ID", defaultAccessTokenClientID),
+		AccessTokenKeyID:          optionalEnv("AUTH_ACCESS_TOKEN_KEY_ID", defaultAccessTokenKeyID),
+		AccessTokenTTL:            lifetime,
 	}, nil
 }
 
@@ -113,6 +159,31 @@ func requireEnv(key string) (string, error) {
 	}
 
 	return value, nil
+}
+
+// optionalEnv returns a trimmed environment value or a safe documented default when absent.
+func optionalEnv(key string, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+// optionalPositiveDurationEnv parses an optional positive Go duration and uses the default when unset.
+func optionalPositiveDurationEnv(key string, fallback string) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		value = fallback
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a valid duration: %w", key, err)
+	}
+	if duration <= 0 {
+		return 0, fmt.Errorf("%s must be greater than zero", key)
+	}
+	return duration, nil
 }
 
 // parseInt32Env đọc một biến môi trường bắt buộc và chuyển nó thành số nguyên int32.

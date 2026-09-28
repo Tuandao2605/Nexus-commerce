@@ -48,15 +48,44 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("initialize password hasher: %w", err)
 	}
+	accessTokenManager, err := auth.NewRS256AccessTokenManagerFromFile(
+		cfg.Auth.AccessTokenPrivateKeyFile,
+		auth.AccessTokenConfig{
+			Issuer:   cfg.Auth.AccessTokenIssuer,
+			Audience: cfg.Auth.AccessTokenAudience,
+			ClientID: cfg.Auth.AccessTokenClientID,
+			KeyID:    cfg.Auth.AccessTokenKeyID,
+			Lifetime: cfg.Auth.AccessTokenTTL,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("initialize access token manager: %w", err)
+	}
 	registrationRepository := auth.NewPostgresRegistrationRepository(
 		pool,
 		usermodule.NewPostgresRegistrationWriter(),
 	)
 	registrationService := auth.NewRegistrationService(registrationRepository, passwordHasher)
 	registrationHandler := auth.NewRegistrationHandler(registrationService, logger)
+	loginRepository := auth.NewPostgresLoginRepository(pool)
+	loginService, err := auth.NewLoginService(
+		loginRepository,
+		usermodule.NewPostgresLoginStatusReader(pool),
+		passwordHasher,
+		logger,
+	)
+	if err != nil {
+		return fmt.Errorf("initialize login service: %w", err)
+	}
+	loginTokenService, err := auth.NewLoginTokenService(loginService, accessTokenManager)
+	if err != nil {
+		return fmt.Errorf("initialize login token service: %w", err)
+	}
+	loginHandler := auth.NewLoginHandler(loginTokenService, logger)
 
 	srv := server.New(cfg, logger, server.RouteDependencies{
 		Registration: registrationHandler,
+		Login:        loginHandler,
 	})
 	if err := srv.Run(); err != nil {
 		return fmt.Errorf("run HTTP server: %w", err)

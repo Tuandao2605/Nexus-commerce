@@ -14,11 +14,16 @@ GET /health
 POST /auth/registrations
 201 Content-Type: application/json
 {"id":"<uuidv7>","display_name":"...","email":"..."}
+
+POST /auth/login
+200 Content-Type: application/json
+{"access_token":"<signed JWT>","token_type":"Bearer","expires_in":900}
 ```
 
-The registration request is bounded to 16 KiB, requires `application/json`,
-rejects unknown fields, and uses the error envelope below. Its exact contract is
-documented in `docs/api.md`.
+Registration and login requests are bounded to 16 KiB, require `application/json`,
+and reject unknown fields. Their exact contracts are documented in `docs/api.md`.
+Login returns a short-lived RS256 `at+jwt` Bearer token and one generic
+`auth.invalid_credentials` response for credential/account failures.
 
 The repository has not finalized a global API prefix, success envelope, pagination response, or error envelope. Preserve an existing contract when one is present. When adding the first shared contract, update this reference/API documentation and cover it with handler tests instead of creating endpoint-specific formats.
 

@@ -17,13 +17,41 @@ func TestLoad(t *testing.T) {
 		wantErrSubstr string
 	}{
 		{
-			name:     "valid config uses default port",
+			name:     "valid config uses default port and access token defaults",
 			wantPort: defaultPort,
 		},
 		{
 			name:     "valid config uses custom port",
 			port:     "9000",
 			wantPort: "9000",
+		},
+		{
+			name: "missing signing key path",
+			mutateEnv: func(t *testing.T) {
+				t.Setenv("AUTH_ACCESS_TOKEN_PRIVATE_KEY_FILE", "")
+			},
+			wantErrSubstr: "AUTH_ACCESS_TOKEN_PRIVATE_KEY_FILE is required",
+		},
+		{
+			name: "invalid access token duration",
+			mutateEnv: func(t *testing.T) {
+				t.Setenv("AUTH_ACCESS_TOKEN_TTL", "later")
+			},
+			wantErrSubstr: "AUTH_ACCESS_TOKEN_TTL must be a valid duration",
+		},
+		{
+			name: "access token duration exceeds limit",
+			mutateEnv: func(t *testing.T) {
+				t.Setenv("AUTH_ACCESS_TOKEN_TTL", "16m")
+			},
+			wantErrSubstr: "AUTH_ACCESS_TOKEN_TTL must be between 1m and 15m",
+		},
+		{
+			name: "non-positive access token duration",
+			mutateEnv: func(t *testing.T) {
+				t.Setenv("AUTH_ACCESS_TOKEN_TTL", "0s")
+			},
+			wantErrSubstr: "AUTH_ACCESS_TOKEN_TTL must be greater than zero",
 		},
 		{
 			name: "missing database URL",
@@ -105,6 +133,9 @@ func TestLoad(t *testing.T) {
 			if cfg.Database.StartupTimeout != 5*time.Second {
 				t.Fatalf("Load() StartupTimeout = %s, want 5s", cfg.Database.StartupTimeout)
 			}
+			if cfg.Auth.AccessTokenTTL != 15*time.Minute || cfg.Auth.AccessTokenPrivateKeyFile != "./secrets/access-token-rsa-private.pem" {
+				t.Fatalf("Load() Auth = %#v, want 15m and configured key file", cfg.Auth)
+			}
 		})
 	}
 }
@@ -120,4 +151,10 @@ func setValidDatabaseEnv(t *testing.T) {
 	t.Setenv("DATABASE_MAX_CONN_IDLE_TIME", "30m")
 	t.Setenv("DATABASE_HEALTH_CHECK_PERIOD", "1m")
 	t.Setenv("DATABASE_STARTUP_TIMEOUT", "5s")
+	t.Setenv("AUTH_ACCESS_TOKEN_PRIVATE_KEY_FILE", "./secrets/access-token-rsa-private.pem")
+	t.Setenv("AUTH_ACCESS_TOKEN_TTL", "")
+	t.Setenv("AUTH_ACCESS_TOKEN_ISSUER", "")
+	t.Setenv("AUTH_ACCESS_TOKEN_AUDIENCE", "")
+	t.Setenv("AUTH_ACCESS_TOKEN_CLIENT_ID", "")
+	t.Setenv("AUTH_ACCESS_TOKEN_KEY_ID", "")
 }

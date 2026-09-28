@@ -42,8 +42,11 @@ The implemented AUTH-003 core canonicalizes email, uses a current-policy dummy
 Argon2id hash for unknown-account work, returns one generic credential error for
 unknown email/wrong password/inactive account, checks User status through a
 User-owned interface, and rehashes a verified legacy hash with compare-and-swap.
-It does not yet expose a public login route or issue tokens; those belong to the
-access-token ticket.
+AUTH-004 exposes POST /auth/login and issues short-lived RS256 at+jwt access
+tokens with configured issuer, audience, client ID, key ID, and expiry. Signing
+uses a protected private-key file; token validation needs only an RSA public key.
+Refresh/session lifecycle and distributed login rate limiting are separate tickets.
+
 
 ## Input and Output Safety
 

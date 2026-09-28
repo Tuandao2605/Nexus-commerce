@@ -11,9 +11,10 @@ import (
 // RouteDependencies chứa các HTTP handler đã được wiring đầy đủ, không chứa business logic trong server package.
 type RouteDependencies struct {
 	Registration http.Handler
+	Login        http.Handler
 }
 
-// RegisterRoutes gắn process health và registration resource vào Chi router.
+// RegisterRoutes gắn process health và Auth HTTP handlers vào Chi router.
 func RegisterRoutes(router chi.Router, dependencies RouteDependencies) {
 	router.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -26,5 +27,8 @@ func RegisterRoutes(router chi.Router, dependencies RouteDependencies) {
 
 	if dependencies.Registration != nil {
 		router.Method(http.MethodPost, "/auth/registrations", dependencies.Registration)
+	}
+	if dependencies.Login != nil {
+		router.Method(http.MethodPost, "/auth/login", dependencies.Login)
 	}
 }

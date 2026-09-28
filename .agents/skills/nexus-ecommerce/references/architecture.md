@@ -5,11 +5,11 @@ Use this reference for module placement, cross-module calls, checkout orchestrat
 ## Implemented State and Target
 
 The repository currently contains a Go 1.23 service using Chi, JSON `slog`,
-graceful shutdown, `GET /health`, `POST /auth/registrations`, PostgreSQL through
-pgxpool, golang-migrate, and the implemented Identity through Payment schemas.
-Auth also has an internal email/password login use case, but public login/token
-issuance is not implemented yet. Remaining application modules and infrastructure
-below are approved targets, not evidence of implemented code.
+graceful shutdown, `GET /health`, `POST /auth/registrations`, and
+`POST /auth/login` with RS256 access-token issuance. Persistence uses PostgreSQL
+through pgxpool and golang-migrate, with implemented Identity through Payment
+schemas. Auth validation uses public-key material separated from signing.
+Refresh/session lifecycle and rate limiting remain separate tickets.
 
 Evolution path:
 
