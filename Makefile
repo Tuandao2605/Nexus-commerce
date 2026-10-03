@@ -233,12 +233,12 @@ test-integration-target: migrate-integration-up
 		go test -timeout "$(GO_TEST_TIMEOUT)" ./internal/database -count=1 \
 		$(if $(DB_TEST_NAME),-run "$(DB_TEST_NAME)",)
 
-# test-auth-integration chạy riêng Auth registration/login tests với PostgreSQL thật và không cho phép skip âm thầm.
+# test-auth-integration chạy riêng Auth registration/login/refresh-token query tests với PostgreSQL thật và không cho phép skip âm thầm.
 test-auth-integration: migrate-integration-up
 	@REQUIRE_DATABASE_INTEGRATION=1 TEST_DATABASE_URL="$(TEST_DATABASE_URL)" \
 		$(QUIET_RUN) "Auth PostgreSQL integration tests" timeout "$(COMMAND_TIMEOUT)" \
 		go test -timeout "$(GO_TEST_TIMEOUT)" ./internal/auth -count=1 \
-		-run '^(TestPostgresRegistrationRepository|TestRegistrationHTTPIntegration|TestPostgresLogin)'
+		-run '^(TestPostgresRegistrationRepository|TestRegistrationHTTPIntegration|TestPostgresLogin|TestPostgresRefreshTokenQueries)'
 
 # diff-check kiểm tra whitespace rồi in scope ngắn, gồm cả untracked files, để agent review trước completion.
 diff-check:

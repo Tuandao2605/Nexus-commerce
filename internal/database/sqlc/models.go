@@ -259,6 +259,17 @@ type ProductVariant struct {
 	ArchivedAt     pgtype.Timestamptz
 }
 
+type RefreshToken struct {
+	ID              pgtype.UUID
+	SessionID       pgtype.UUID
+	TokenHash       []byte
+	PreviousTokenID pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	ExpiresAt       pgtype.Timestamptz
+	ConsumedAt      pgtype.Timestamptz
+	RevokedAt       pgtype.Timestamptz
+}
+
 type SellerAccount struct {
 	ID          pgtype.UUID
 	UserID      pgtype.UUID

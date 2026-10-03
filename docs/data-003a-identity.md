@@ -1022,13 +1022,13 @@ Không lưu access token.
 
 Không lưu raw refresh token trong session.
 
-Refresh token rotation sẽ được thiết kế bằng bảng riêng:
+Refresh token được lưu trong bảng riêng `refresh_tokens`, liên kết với đúng một session. Chỉ SHA-256 digest 32 byte được lưu; raw token không được persist. `previous_token_id` giữ quan hệ predecessor cùng session và unique để rotation ticket có thể phát hiện replay.
 
 ```text
 refresh_tokens
 ```
 
-ở Auth ticket sau.
+Migration và sqlc queries được triển khai trong ECOM-AUTH-005. Consume là conditional update yêu cầu token còn hạn/chưa consume/chưa revoke và session còn sống; orchestration, xử lý replay và phát hành credential kế tiếp thuộc ECOM-AUTH-006.
 
 Session đại diện cho:
 

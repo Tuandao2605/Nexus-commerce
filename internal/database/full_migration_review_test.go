@@ -77,7 +77,7 @@ func TestFullMigrationReviewMatchesLatestCleanVersion(t *testing.T) {
 	}
 }
 
-// TestFullMigrationReviewOwnsExpectedTables xác nhận final schema có đúng 27 bảng V1 thuộc Identity đến Payment và không có bảng ngoài scope.
+// TestFullMigrationReviewOwnsExpectedTables xác nhận final schema có đúng 28 bảng V1 thuộc Identity đến Auth và Payment, không có bảng ngoài scope.
 func TestFullMigrationReviewOwnsExpectedTables(t *testing.T) {
 	ctx, tx := beginMigrationTest(t)
 	expectedTables := []string{
@@ -97,6 +97,7 @@ func TestFullMigrationReviewOwnsExpectedTables(t *testing.T) {
 		"payment_webhook_events",
 		"product_variants",
 		"products",
+		"refresh_tokens",
 		"seller_accounts",
 		"sessions",
 		"shop_memberships",
