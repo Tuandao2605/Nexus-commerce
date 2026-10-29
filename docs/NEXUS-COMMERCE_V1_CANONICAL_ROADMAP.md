@@ -4,7 +4,7 @@
 
 **Status:** Active Development  
 **Current Stage:** V1 — Production-Grade Core Commerce  
-**Current Active Ticket:** `ECOM-AUTH-005 — Refresh Token Schema/Queries`
+**Current Active Ticket:** `ECOM-AUTH-007 — Logout / Revocation`
 **Next Stage:** V2 — Business-Complete Event-Driven Modular Monolith  
 **Future Stage:** V3 — Selective Microservices & Event Streaming
 
@@ -680,9 +680,9 @@ ECOM-AUTH-001 Registration                      ✅ PASS (verified 2026-09-19)
 ECOM-AUTH-002 Password Hashing                  ✅ PASS (verified 2026-09-19)
 ECOM-AUTH-003 Login                             ✅ PASS (verified 2026-09-19)
 ECOM-AUTH-004 Access Token                      ✅ PASS (verified 2026-09-28)
-ECOM-AUTH-005 Refresh Token Schema/Queries       ← CURRENT
-ECOM-AUTH-006 Refresh Rotation
-ECOM-AUTH-007 Logout / Revocation
+ECOM-AUTH-005 Refresh Token Schema/Queries       ✅ PASS (verified 2026-10-22)
+ECOM-AUTH-006 Refresh Rotation                   ✅ PASS (verified 2026-10-22)
+ECOM-AUTH-007 Logout / Revocation                ← CURRENT
 ECOM-AUTH-008 Password Reset
 ECOM-AUTH-009 Email Verification
 ECOM-AUTH-010 Session Management
@@ -1098,7 +1098,11 @@ ECOM-AUTH-003 Login                        ✅ PASS
         ↓
 ECOM-AUTH-004 Access Token                 ✅ PASS
         ↓
-ECOM-AUTH-005 Refresh Token Schema/Queries  ← CURRENT
+ECOM-AUTH-005 Refresh Token Schema/Queries  ✅ PASS
+        ↓
+ECOM-AUTH-006 Refresh Rotation              ✅ PASS
+        ↓
+ECOM-AUTH-007 Logout / Revocation           ← CURRENT
 ```
 
 Sau đó mới bước vào business implementation.

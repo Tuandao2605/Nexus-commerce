@@ -79,3 +79,15 @@ func TestLoginRouteDelegatesToInjectedHandler(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 }
+
+// TestRefreshRouteDelegatesWithoutAccessToken xác nhận refresh route nhận POST dù access token đã hết hạn hoặc không có.
+func TestRefreshRouteDelegatesWithoutAccessToken(t *testing.T) {
+	called := false
+	router := chi.NewRouter()
+	RegisterRoutes(router, RouteDependencies{Refresh: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { called = true; w.WriteHeader(200) })})
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest("POST", "/auth/refresh", nil))
+	if !called || response.Code != 200 {
+		t.Fatal("refresh handler not routed")
+	}
+}

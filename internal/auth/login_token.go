@@ -12,35 +12,40 @@ type LoginAuthenticator interface {
 	Authenticate(ctx context.Context, input LoginInput) (AuthenticatedIdentity, error)
 }
 
-// LoginTokenService điều phối đăng nhập và ký access token mà không lưu token trong database.
+// LoginTokenService xác thực Credential trước khi phát token pair và ghi session qua Auth boundary.
 type LoginTokenService struct {
 	authenticator LoginAuthenticator
-	issuer        AccessTokenIssuer
+	issuer        LoginSessionIssuer
 }
 
-// NewLoginTokenService injects the AUTH-003 authenticator and configured access-token issuer.
-func NewLoginTokenService(authenticator LoginAuthenticator, issuer AccessTokenIssuer) (*LoginTokenService, error) {
+// LoginSessionIssuer phát cặp token với session persistence atomically sau successful authentication.
+type LoginSessionIssuer interface {
+	IssueLogin(context.Context, AuthenticatedIdentity) (IssuedTokenPair, error)
+}
+
+// NewLoginTokenService injects the AUTH-003 authenticator and transactional session/token issuer.
+func NewLoginTokenService(authenticator LoginAuthenticator, issuer LoginSessionIssuer) (*LoginTokenService, error) {
 	if authenticator == nil || issuer == nil {
 		return nil, errors.New("login token service is not configured")
 	}
 	return &LoginTokenService{authenticator: authenticator, issuer: issuer}, nil
 }
 
-// Login authenticates the user first, then issues a short-lived bearer token for the returned identity.
-func (s *LoginTokenService) Login(ctx context.Context, input LoginInput) (IssuedAccessToken, error) {
+// Login authenticates the user first, then persists a session and issues its initial token pair.
+func (s *LoginTokenService) Login(ctx context.Context, input LoginInput) (IssuedTokenPair, error) {
 	if s == nil || s.authenticator == nil || s.issuer == nil {
-		return IssuedAccessToken{}, errors.New("login token service is not configured")
+		return IssuedTokenPair{}, errors.New("login token service is not configured")
 	}
 	identity, err := s.authenticator.Authenticate(ctx, input)
 	if err != nil {
-		return IssuedAccessToken{}, err
+		return IssuedTokenPair{}, err
 	}
 	if err := ctx.Err(); err != nil {
-		return IssuedAccessToken{}, err
+		return IssuedTokenPair{}, err
 	}
-	token, err := s.issuer.Issue(identity)
+	token, err := s.issuer.IssueLogin(ctx, identity)
 	if err != nil {
-		return IssuedAccessToken{}, fmt.Errorf("issue access token: %w", err)
+		return IssuedTokenPair{}, fmt.Errorf("issue login token pair: %w", err)
 	}
 	return token, nil
 }

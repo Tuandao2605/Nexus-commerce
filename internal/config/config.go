@@ -32,6 +32,7 @@ type AuthConfig struct {
 	AccessTokenClientID       string
 	AccessTokenKeyID          string
 	AccessTokenTTL            time.Duration
+	RefreshTokenTTL           time.Duration
 }
 
 type DatabaseConfig struct {
@@ -81,6 +82,13 @@ func loadAuthConfig() (AuthConfig, error) {
 	if lifetime < time.Minute || lifetime > 15*time.Minute {
 		return AuthConfig{}, fmt.Errorf("AUTH_ACCESS_TOKEN_TTL must be between 1m and 15m")
 	}
+	refreshLifetime, err := optionalPositiveDurationEnv("AUTH_REFRESH_TOKEN_TTL", "168h")
+	if err != nil {
+		return AuthConfig{}, err
+	}
+	if refreshLifetime < time.Minute || refreshLifetime > 720*time.Hour {
+		return AuthConfig{}, fmt.Errorf("AUTH_REFRESH_TOKEN_TTL must be between 1m and 720h")
+	}
 	return AuthConfig{
 		AccessTokenPrivateKeyFile: privateKeyFile,
 		AccessTokenIssuer:         optionalEnv("AUTH_ACCESS_TOKEN_ISSUER", defaultAccessTokenIssuer),
@@ -88,6 +96,7 @@ func loadAuthConfig() (AuthConfig, error) {
 		AccessTokenClientID:       optionalEnv("AUTH_ACCESS_TOKEN_CLIENT_ID", defaultAccessTokenClientID),
 		AccessTokenKeyID:          optionalEnv("AUTH_ACCESS_TOKEN_KEY_ID", defaultAccessTokenKeyID),
 		AccessTokenTTL:            lifetime,
+		RefreshTokenTTL:           refreshLifetime,
 	}, nil
 }
 

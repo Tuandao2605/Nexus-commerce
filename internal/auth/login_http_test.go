@@ -16,13 +16,13 @@ import (
 
 type stubLoginUseCase struct {
 	input  LoginInput
-	result IssuedAccessToken
+	result IssuedTokenPair
 	err    error
 	calls  int
 }
 
 // Login captures the request and returns the configured token/error to the handler.
-func (s *stubLoginUseCase) Login(_ context.Context, input LoginInput) (IssuedAccessToken, error) {
+func (s *stubLoginUseCase) Login(_ context.Context, input LoginInput) (IssuedTokenPair, error) {
 	s.calls++
 	s.input = input
 	return s.result, s.err
@@ -30,7 +30,7 @@ func (s *stubLoginUseCase) Login(_ context.Context, input LoginInput) (IssuedAcc
 
 // TestLoginHandlerReturnsBearerToken verifies successful login returns only token metadata and bearer token.
 func TestLoginHandlerReturnsBearerToken(t *testing.T) {
-	login := &stubLoginUseCase{result: IssuedAccessToken{Value: "signed.jwt.value", TokenType: "Bearer", ExpiresIn: 900}}
+	login := &stubLoginUseCase{result: IssuedTokenPair{IssuedAccessToken: IssuedAccessToken{Value: "signed.jwt.value", TokenType: "Bearer", ExpiresIn: 900}, RefreshToken: "opaque.refresh.value", RefreshExpiresIn: 604800}}
 	handler := newLoginTestHandler(login)
 	response := performLoginRequest(handler, `{"email":"user@example.com","password":"correct horse"}`, "application/json")
 
@@ -44,7 +44,7 @@ func TestLoginHandlerReturnsBearerToken(t *testing.T) {
 	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
 		t.Fatalf("decode login response: %v", err)
 	}
-	if body != (loginHTTPResponse{AccessToken: "signed.jwt.value", TokenType: "Bearer", ExpiresIn: 900}) {
+	if body != (loginHTTPResponse{AccessToken: "signed.jwt.value", TokenType: "Bearer", ExpiresIn: 900, RefreshToken: "opaque.refresh.value", RefreshExpiresIn: 604800}) {
 		t.Fatalf("login response = %#v", body)
 	}
 	if login.calls != 1 || login.input != (LoginInput{Email: "user@example.com", Password: "correct horse"}) {

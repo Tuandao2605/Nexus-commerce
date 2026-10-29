@@ -1,6 +1,6 @@
 # ECOM-AUTH-005 — Refresh Token Schema/Queries
 
-Status: IN_PROGRESS — implementation is present; PostgreSQL migration/integration verification is pending because `TEST_DATABASE_URL` is not configured in this environment.
+Status: DONE
 
 ## Source Design
 
@@ -32,14 +32,14 @@ Add persistent storage and type-safe SQL operations for opaque refresh-token cre
 - `internal/database/full_migration_review_test.go` includes the new table in the canonical V1 schema inventory.
 - `Makefile` includes the refresh-query integration test in `test-auth-integration`.
 - `docs/data-003a-identity.md` records the implemented refresh-token persistence contract.
-- `docs/NEXUS-COMMERCE_V1_CANONICAL_ROADMAP.md` remains on AUTH-005 until required PostgreSQL verification passes.
+- `docs/NEXUS-COMMERCE_V1_CANONICAL_ROADMAP.md` records PASS after required PostgreSQL verification completed during AUTH-006.
 
 ## Acceptance Criteria
 
 - [x] New sequential UP/DOWN migration follows repository transaction and rollback conventions.
 - [x] Database rejects malformed/duplicate digests, cross-session lineage, and multiple successors.
 - [x] sqlc generates typed operations and checks the SQL against the complete schema.
-- [ ] PostgreSQL tests verify insertion, lookup, conditional consume, and session-wide revocation.
+- [x] PostgreSQL tests verify insertion, lookup, conditional consume, and session-wide revocation.
 - [x] Canonical migration/schema inventory reflects the new table.
 - [x] AUTH-006 remains responsible for rotation endpoint, transaction orchestration, replay response, and token issuance.
 
@@ -49,14 +49,16 @@ Add persistent storage and type-safe SQL operations for opaque refresh-token cre
 - `make sqlc-generate`: PASS
 - `make sqlc-check`: PASS
 - Focused Go test compile/run: PASS (integration cases may skip without `TEST_DATABASE_URL`)
-- `make db-migration-status`, `make migrate-integration-cycle`, focused required-DB integration test: NOT RUN — `TEST_DATABASE_URL` is not configured; the first command exits with `TEST_DATABASE_URL is required`.
+- Required PostgreSQL tests: PASS — reverified on 2026-10-22 during AUTH-006, including schema constraints and generated queries.
+- Full migration rollback/apply cycle: PASS — 9 → empty schema → 9 on the isolated test database.
+- `make db-migration-status`: PASS — version 9, clean.
 - `make verify-fast`: PASS
-- `make verify-full`: NOT RUN — its required PostgreSQL integration phase cannot run without `TEST_DATABASE_URL`.
+- `make verify-full`: PASS — reverified on 2026-10-22 with PostgreSQL integration required.
 - `make diff-check`: PASS
 
 ## Result
 
-IN_PROGRESS until the migration cycle and required PostgreSQL integration tests pass against the isolated test database.
+PASS
 
 ## Next
 

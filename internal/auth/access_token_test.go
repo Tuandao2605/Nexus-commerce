@@ -244,3 +244,9 @@ func (s *stubAccessTokenIssuer) Issue(_ AuthenticatedIdentity) (IssuedAccessToke
 	s.calls++
 	return s.result, nil
 }
+
+// IssueLogin captures session issuance for the login orchestration regression test.
+func (s *stubAccessTokenIssuer) IssueLogin(_ context.Context, _ AuthenticatedIdentity) (IssuedTokenPair, error) {
+	s.calls++
+	return IssuedTokenPair{IssuedAccessToken: s.result}, nil
+}

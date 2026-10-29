@@ -157,4 +157,32 @@ func setValidDatabaseEnv(t *testing.T) {
 	t.Setenv("AUTH_ACCESS_TOKEN_AUDIENCE", "")
 	t.Setenv("AUTH_ACCESS_TOKEN_CLIENT_ID", "")
 	t.Setenv("AUTH_ACCESS_TOKEN_KEY_ID", "")
+	t.Setenv("AUTH_REFRESH_TOKEN_TTL", "")
+}
+
+// TestRefreshLifetimeConfig kiểm tra default 7 ngày, cấu hình tùy chỉnh và bound tuyệt đối của session.
+func TestRefreshLifetimeConfig(t *testing.T) {
+	for _, tc := range []struct {
+		value   string
+		want    time.Duration
+		invalid bool
+	}{
+		{want: 168 * time.Hour}, {value: "24h", want: 24 * time.Hour}, {value: "720h", want: 720 * time.Hour},
+		{value: "0s", invalid: true}, {value: "59s", invalid: true}, {value: "721h", invalid: true}, {value: "invalid", invalid: true},
+	} {
+		t.Run(tc.value, func(t *testing.T) {
+			setValidDatabaseEnv(t)
+			t.Setenv("AUTH_REFRESH_TOKEN_TTL", tc.value)
+			cfg, err := Load()
+			if tc.invalid {
+				if err == nil {
+					t.Fatal("invalid refresh TTL accepted")
+				}
+				return
+			}
+			if err != nil || cfg.Auth.RefreshTokenTTL != tc.want {
+				t.Fatalf("refresh lifetime = %v, err=%v", cfg.Auth.RefreshTokenTTL, err)
+			}
+		})
+	}
 }

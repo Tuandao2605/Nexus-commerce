@@ -12,6 +12,7 @@ import (
 type RouteDependencies struct {
 	Registration http.Handler
 	Login        http.Handler
+	Refresh      http.Handler
 }
 
 // RegisterRoutes gắn process health và Auth HTTP handlers vào Chi router.
@@ -30,5 +31,8 @@ func RegisterRoutes(router chi.Router, dependencies RouteDependencies) {
 	}
 	if dependencies.Login != nil {
 		router.Method(http.MethodPost, "/auth/login", dependencies.Login)
+	}
+	if dependencies.Refresh != nil {
+		router.Method(http.MethodPost, "/auth/refresh", dependencies.Refresh)
 	}
 }

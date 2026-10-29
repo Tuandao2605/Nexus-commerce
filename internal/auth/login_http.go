@@ -15,7 +15,7 @@ const maxLoginRequestBytes int64 = 16 * 1024
 
 // LoginUseCase là contract HTTP handler cần để xác minh người dùng và phát access token.
 type LoginUseCase interface {
-	Login(ctx context.Context, input LoginInput) (IssuedAccessToken, error)
+	Login(ctx context.Context, input LoginInput) (IssuedTokenPair, error)
 }
 
 type loginHTTPRequest struct {
@@ -24,9 +24,11 @@ type loginHTTPRequest struct {
 }
 
 type loginHTTPResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int64  `json:"expires_in"`
+	AccessToken      string `json:"access_token"`
+	TokenType        string `json:"token_type"`
+	ExpiresIn        int64  `json:"expires_in"`
+	RefreshToken     string `json:"refresh_token"`
+	RefreshExpiresIn int64  `json:"refresh_expires_in"`
 }
 
 type loginErrorResponse struct {
@@ -81,9 +83,11 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.writeJSON(w, http.StatusOK, loginHTTPResponse{
-		AccessToken: token.Value,
-		TokenType:   token.TokenType,
-		ExpiresIn:   token.ExpiresIn,
+		AccessToken:      token.Value,
+		TokenType:        token.TokenType,
+		ExpiresIn:        token.ExpiresIn,
+		RefreshToken:     token.RefreshToken,
+		RefreshExpiresIn: token.RefreshExpiresIn,
 	})
 }
 

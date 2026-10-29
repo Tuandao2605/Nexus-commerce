@@ -54,6 +54,7 @@ export GOCACHE
 	test-integration \
 	test-integration-target \
 	test-auth-integration \
+	test-auth-race \
 	diff-check \
 	verify-fast \
 	verify-full \
@@ -238,7 +239,13 @@ test-auth-integration: migrate-integration-up
 	@REQUIRE_DATABASE_INTEGRATION=1 TEST_DATABASE_URL="$(TEST_DATABASE_URL)" \
 		$(QUIET_RUN) "Auth PostgreSQL integration tests" timeout "$(COMMAND_TIMEOUT)" \
 		go test -timeout "$(GO_TEST_TIMEOUT)" ./internal/auth -count=1 \
-		-run '^(TestPostgresRegistrationRepository|TestRegistrationHTTPIntegration|TestPostgresLogin|TestPostgresRefreshTokenQueries)'
+		-run '^(TestPostgresRegistrationRepository|TestRegistrationHTTPIntegration|TestPostgresLogin|TestPostgresRefresh)'
+
+# test-auth-race kiểm tra refresh/session concurrency với PostgreSQL thật và Go race detector.
+test-auth-race: migrate-integration-up
+	@REQUIRE_DATABASE_INTEGRATION=1 TEST_DATABASE_URL="$(TEST_DATABASE_URL)" \
+		$(QUIET_RUN) "Auth refresh race tests" timeout "$(COMMAND_TIMEOUT)" \
+		go test -race -timeout "$(GO_TEST_TIMEOUT)" ./internal/auth -count=1 -run '^(TestPostgresRefresh|TestRefresh)'
 
 # diff-check kiểm tra whitespace rồi in scope ngắn, gồm cả untracked files, để agent review trước completion.
 diff-check:

@@ -13,34 +13,34 @@ import (
 
 const consumeRefreshToken = `-- name: ConsumeRefreshToken :execrows
 UPDATE refresh_tokens AS token
-SET consumed_at = now()
+SET consumed_at = clock_timestamp()
 WHERE token.id = $1
   AND token.consumed_at IS NULL
   AND token.revoked_at IS NULL
-  AND token.expires_at > now()
+  AND token.expires_at > clock_timestamp()
   AND EXISTS (
       SELECT 1
       FROM sessions AS session
       WHERE session.id = token.session_id
         AND session.revoked_at IS NULL
-        AND session.expires_at > now()
+        AND session.expires_at > clock_timestamp()
   )
 `
 
 // ConsumeRefreshToken chỉ consume token còn hạn/chưa dùng thuộc session chưa revoke/hết hạn; affected rows báo kết quả CAS.
 //
 //	UPDATE refresh_tokens AS token
-//	SET consumed_at = now()
+//	SET consumed_at = clock_timestamp()
 //	WHERE token.id = $1
 //	  AND token.consumed_at IS NULL
 //	  AND token.revoked_at IS NULL
-//	  AND token.expires_at > now()
+//	  AND token.expires_at > clock_timestamp()
 //	  AND EXISTS (
 //	      SELECT 1
 //	      FROM sessions AS session
 //	      WHERE session.id = token.session_id
 //	        AND session.revoked_at IS NULL
-//	        AND session.expires_at > now()
+//	        AND session.expires_at > clock_timestamp()
 //	  )
 func (q *Queries) ConsumeRefreshToken(ctx context.Context, id pgtype.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, consumeRefreshToken, id)
@@ -59,7 +59,8 @@ SELECT $1, session.id, $2, $3,
 FROM sessions AS session
 WHERE session.id = $6
   AND session.revoked_at IS NULL
-  AND session.expires_at > now()
+  AND session.expires_at > clock_timestamp()
+  AND $5 > clock_timestamp()
   AND $5 <= session.expires_at
 `
 
@@ -82,7 +83,8 @@ type CreateRefreshTokenParams struct {
 //	FROM sessions AS session
 //	WHERE session.id = $6
 //	  AND session.revoked_at IS NULL
-//	  AND session.expires_at > now()
+//	  AND session.expires_at > clock_timestamp()
+//	  AND $5 > clock_timestamp()
 //	  AND $5 <= session.expires_at
 func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (int64, error) {
 	result, err := q.db.Exec(ctx, createRefreshToken,
@@ -130,7 +132,7 @@ func (q *Queries) GetRefreshTokenByHash(ctx context.Context, tokenHash []byte) (
 
 const revokeSessionRefreshTokens = `-- name: RevokeSessionRefreshTokens :execrows
 UPDATE refresh_tokens
-SET revoked_at = now()
+SET revoked_at = clock_timestamp()
 WHERE session_id = $1
   AND revoked_at IS NULL
 `
@@ -138,7 +140,7 @@ WHERE session_id = $1
 // RevokeSessionRefreshTokens thu hồi mọi refresh token chưa bị revoke trong session khi logout/revoke session.
 //
 //	UPDATE refresh_tokens
-//	SET revoked_at = now()
+//	SET revoked_at = clock_timestamp()
 //	WHERE session_id = $1
 //	  AND revoked_at IS NULL
 func (q *Queries) RevokeSessionRefreshTokens(ctx context.Context, sessionID pgtype.UUID) (int64, error) {

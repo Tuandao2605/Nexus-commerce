@@ -16,28 +16,29 @@ SELECT sqlc.arg(id), session.id, sqlc.arg(token_hash), sqlc.narg(previous_token_
 FROM sessions AS session
 WHERE session.id = sqlc.arg(session_id)
   AND session.revoked_at IS NULL
-  AND session.expires_at > now()
+  AND session.expires_at > clock_timestamp()
+  AND sqlc.arg(expires_at) > clock_timestamp()
   AND sqlc.arg(expires_at) <= session.expires_at;
 
 -- ConsumeRefreshToken chỉ consume token còn hạn/chưa dùng thuộc session chưa revoke/hết hạn; affected rows báo kết quả CAS.
 -- name: ConsumeRefreshToken :execrows
 UPDATE refresh_tokens AS token
-SET consumed_at = now()
+SET consumed_at = clock_timestamp()
 WHERE token.id = $1
   AND token.consumed_at IS NULL
   AND token.revoked_at IS NULL
-  AND token.expires_at > now()
+  AND token.expires_at > clock_timestamp()
   AND EXISTS (
       SELECT 1
       FROM sessions AS session
       WHERE session.id = token.session_id
         AND session.revoked_at IS NULL
-        AND session.expires_at > now()
+        AND session.expires_at > clock_timestamp()
   );
 
 -- RevokeSessionRefreshTokens thu hồi mọi refresh token chưa bị revoke trong session khi logout/revoke session.
 -- name: RevokeSessionRefreshTokens :execrows
 UPDATE refresh_tokens
-SET revoked_at = now()
+SET revoked_at = clock_timestamp()
 WHERE session_id = $1
   AND revoked_at IS NULL;

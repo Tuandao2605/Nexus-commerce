@@ -77,7 +77,12 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("initialize login service: %w", err)
 	}
-	loginTokenService, err := auth.NewLoginTokenService(loginService, accessTokenManager)
+	refreshRepository := auth.NewPostgresRefreshRepository(pool, usermodule.NewPostgresAuthSessionReader())
+	refreshService, err := auth.NewRefreshService(refreshRepository, accessTokenManager, cfg.Auth.RefreshTokenTTL)
+	if err != nil {
+		return fmt.Errorf("initialize refresh service: %w", err)
+	}
+	loginTokenService, err := auth.NewLoginTokenService(loginService, refreshService)
 	if err != nil {
 		return fmt.Errorf("initialize login token service: %w", err)
 	}
@@ -86,6 +91,7 @@ func run(logger *slog.Logger) error {
 	srv := server.New(cfg, logger, server.RouteDependencies{
 		Registration: registrationHandler,
 		Login:        loginHandler,
+		Refresh:      auth.NewRefreshHandler(refreshService, logger),
 	})
 	if err := srv.Run(); err != nil {
 		return fmt.Errorf("run HTTP server: %w", err)
